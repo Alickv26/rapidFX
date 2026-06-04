@@ -3,8 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  *, *::before, *::after {
+    @apply box-border;
+  }
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
   body {
-    @apply bg-gray-900 text-gray-100 antialiased;
+    @apply bg-gray-900 text-gray-100 antialiased overflow-hidden;
   }
 }
 

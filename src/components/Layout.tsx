@@ -29,7 +29,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       <aside className="w-64 shrink-0 bg-surface-100 border-r border-surface-200 flex flex-col overflow-y-auto">
         <div className="p-6 border-b border-surface-200">
           <h1 className="text-xl font-bold text-brand-400">RapidFX</h1>
@@ -79,7 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-8">{children}</div>
       </main>
     </div>
