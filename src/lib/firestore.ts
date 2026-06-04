@@ -16,11 +16,14 @@ import {
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import type { Strategy, StrategyInput } from '../types/strategy'
-import type { Trade, Signal } from '../types/trade'
+import type { Trade, Signal, Candle, AccountSnapshot } from '../types/trade'
+import type { NewsEvent } from '../types/news'
 
 const STRATEGIES = 'strategies'
 const TRADES = 'trades'
 const SIGNALS = 'signals'
+const NEWS = 'newsEvents'
+const CANDLES = 'candles'
 
 // ── Strategies ──
 
@@ -108,4 +111,42 @@ export function subscribeSignals(uid: string, cb: (signals: Signal[]) => void, m
     })
   })
   return () => { if (unsub) unsub() }
+}
+
+// ── News Events ──
+
+export function subscribeNewsEvents(cb: (events: NewsEvent[]) => void): Unsubscribe {
+  const q = query(
+    collection(db, NEWS),
+    orderBy('timestamp', 'asc'),
+    limit(200)
+  )
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as NewsEvent)))
+  })
+}
+
+// ── Candles ──
+
+export function subscribeCandles(symbol: string, cb: (candles: Candle[]) => void): Unsubscribe {
+  return onSnapshot(doc(db, CANDLES, symbol), (snap) => {
+    if (snap.exists()) {
+      cb((snap.data().candles as Candle[]) || [])
+    } else {
+      cb([])
+    }
+  })
+}
+
+// ── Account Snapshots ──
+
+export function subscribeAccountSnapshots(uid: string, cb: (snapshots: AccountSnapshot[]) => void): Unsubscribe {
+  const q = query(
+    collection(db, 'users', uid, 'accountSnapshots'),
+    orderBy('timestamp', 'asc'),
+    limit(500)
+  )
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AccountSnapshot)))
+  })
 }

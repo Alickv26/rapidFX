@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { createRouter } from './mt5-bridge.js'
+import { refreshNewsCalendar, RateLimitError } from './news/forexfactory.js'
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason)
@@ -17,6 +18,17 @@ app.use('/', createRouter())
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() })
+})
+
+app.post('/news/refresh', async (_req, res) => {
+  try {
+    const result = await refreshNewsCalendar()
+    res.json({ success: true, ...result })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[news] Manual refresh error:', message)
+    res.status(500).json({ success: false, error: message })
+  }
 })
 
 app.listen(PORT, '127.0.0.1', () => {
@@ -39,5 +51,28 @@ app.listen(PORT, '127.0.0.1', () => {
   console.log('  POST /ea/close     ← MT5 EA reports closed positions')
   console.log('  GET  /status       → Bot engine health & stats')
   console.log('  GET  /health       → Server health check')
+  console.log('  POST /news/refresh → Manual news calendar refresh')
   console.log('')
+  console.log(`News calendar will refresh automatically every 60 minutes`)
+  console.log('')
+
+  const NEWS_INTERVAL = 60 * 60 * 1000 // 60 min
+  const NEWS_RETRY = 5 * 60 * 1000     // 5 min
+
+  async function scheduledNewsRefresh(): Promise<void> {
+    try {
+      await refreshNewsCalendar()
+    } catch (err) {
+      if (err instanceof RateLimitError) {
+        console.log('[news] Rate limited — retrying in 5 minutes')
+        setTimeout(scheduledNewsRefresh, NEWS_RETRY)
+        return
+      }
+      console.error('[news] Refresh error:', err instanceof Error ? err.message : err)
+    }
+  }
+
+  // initial fetch after 5s delay, then every 60 minutes
+  setTimeout(scheduledNewsRefresh, 5000)
+  setInterval(scheduledNewsRefresh, NEWS_INTERVAL)
 })

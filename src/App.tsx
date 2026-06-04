@@ -12,6 +12,7 @@ import { StrategyEditPage } from "./pages/StrategyEdit";
 import { TradesPage } from "./pages/Trades";
 import { BacktestPage } from "./pages/Backtest";
 import { AuditLogPage } from "./pages/AuditLog";
+import { NewsCalendarPage } from "./pages/NewsCalendar";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AuditLogPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/news"
+        element={
+          <ProtectedRoute>
+            <NewsCalendarPage />
           </ProtectedRoute>
         }
       />

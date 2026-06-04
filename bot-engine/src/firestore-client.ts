@@ -3,14 +3,14 @@ import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { initializeApp, cert, getApps } from 'firebase-admin/app'
 import { getFirestore as getAdminFirestore, type Firestore } from 'firebase-admin/firestore'
-import type { StrategyConfig, Trade, Signal } from './types.js'
+import type { StrategyConfig, Trade, Signal, Candle, NewsEvent } from './types.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 let db: Firestore | null = null
 let initialized = false
 
-function getFirestore(): Firestore {
+export function getFirestore(): Firestore {
   if (initialized && db) return db
 
   const serviceAccountPath = resolve(__dirname, '..', 'service-account.json')
@@ -106,5 +106,28 @@ export async function updateAccountSnapshot(
   await firestore.collection('users').doc(uid).collection('accountSnapshots').add({
     ...data,
     timestamp: Date.now(),
+  })
+}
+
+export async function getUpcomingNews(
+  start: number,
+  end: number
+): Promise<NewsEvent[]> {
+  const firestore = getFirestore()
+  const snap = await firestore
+    .collection('newsEvents')
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .limit(100)
+    .get()
+  return snap.docs.map((d) => d.data() as NewsEvent)
+}
+
+export async function writeCandles(symbol: string, candles: Candle[]): Promise<void> {
+  const firestore = getFirestore()
+  await firestore.collection('candles').doc(symbol).set({
+    symbol,
+    candles,
+    updatedAt: Date.now(),
   })
 }

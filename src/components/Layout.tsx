@@ -6,6 +6,7 @@ import {
   LogOut,
   FlaskConical,
   Activity,
+  Newspaper,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { usePaperMode } from '../contexts/PaperModeContext'
@@ -16,6 +17,7 @@ const navItems = [
   { to: '/trades', icon: Activity, label: 'Trades' },
   { to: '/backtest', icon: FlaskConical, label: 'Backtest' },
   { to: '/audit', icon: ScrollText, label: 'Audit Log' },
+  { to: '/news', icon: Newspaper, label: 'News' },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {

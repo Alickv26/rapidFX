@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /strategies/{doc} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+    match /trades/{doc} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow write: if request.auth != null && request.auth.uid == resource.data.uid;
+    }
+    match /signals/{doc} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow write: if request.auth != null;
+    }
+    match /auditLogs/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /newsEvents/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /candles/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /users/{uid}/{document=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null;
+    }
+  }
+}

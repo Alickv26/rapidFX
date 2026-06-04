@@ -93,7 +93,22 @@ export interface StrategyConfig {
   newsFilter: {
     enabled: boolean
     minImpact: 'low' | 'medium' | 'high'
+    windowBefore: number
+    windowAfter: number
   }
+}
+
+export interface NewsEvent {
+  id: string
+  date: string
+  time: string
+  timestamp: number
+  currency: string
+  impact: 'High' | 'Medium' | 'Low'
+  event: string
+  previous: string | null
+  forecast: string | null
+  actual: string | null
 }
 
 export interface Signal {

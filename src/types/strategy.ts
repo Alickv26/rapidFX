@@ -23,6 +23,8 @@ export interface PositionSizing {
 export interface NewsFilterConfig {
   enabled: boolean
   minImpact: 'low' | 'medium' | 'high'
+  windowBefore: number
+  windowAfter: number
 }
 
 export type Timeframe = 'M1' | 'M5' | 'M15' | 'M30' | 'H1' | 'H4' | 'D1'

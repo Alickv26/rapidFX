@@ -30,7 +30,7 @@ const defaultForm: StrategyInput = {
   maxOpenTrades: 3,
   drawdownLimit: 10,
   positionSizing: { riskPerTrade: 2 },
-  newsFilter: { enabled: false, minImpact: "medium" },
+  newsFilter: { enabled: false, minImpact: "medium", windowBefore: 2, windowAfter: 0 },
 };
 
 interface Props {
@@ -429,28 +429,76 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
           }
         />
         {f.newsFilter.enabled && (
-          <div className="max-w-xs">
-            <label className="label" htmlFor="minImpact">
-              Minimum Impact Level
-            </label>
-            <select
-              id="minImpact"
-              className="input"
-              value={f.newsFilter.minImpact}
-              onChange={(e) =>
-                setF((prev) => ({
-                  ...prev,
-                  newsFilter: {
-                    ...prev.newsFilter,
-                    minImpact: e.target.value as "low" | "medium" | "high",
-                  },
-                }))
-              }
-            >
-              <option value="low">Low + Medium + High</option>
-              <option value="medium">Medium + High</option>
-              <option value="high">High only</option>
-            </select>
+          <div className="space-y-4 max-w-xs">
+            <div>
+              <label className="label" htmlFor="minImpact">
+                Minimum Impact Level
+              </label>
+              <select
+                id="minImpact"
+                className="input"
+                value={f.newsFilter.minImpact}
+                onChange={(e) =>
+                  setF((prev) => ({
+                    ...prev,
+                    newsFilter: {
+                      ...prev.newsFilter,
+                      minImpact: e.target.value as "low" | "medium" | "high",
+                    },
+                  }))
+                }
+              >
+                <option value="low">Low + Medium + High</option>
+                <option value="medium">Medium + High</option>
+                <option value="high">High only</option>
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="windowBefore">
+                Pause Before (hours)
+              </label>
+              <input
+                id="windowBefore"
+                type="number"
+                className="input"
+                min={0}
+                max={24}
+                step={0.5}
+                value={f.newsFilter.windowBefore}
+                onChange={(e) =>
+                  setF((prev) => ({
+                    ...prev,
+                    newsFilter: {
+                      ...prev.newsFilter,
+                      windowBefore: parseFloat(e.target.value),
+                    },
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="windowAfter">
+                Resume After (hours)
+              </label>
+              <input
+                id="windowAfter"
+                type="number"
+                className="input"
+                min={0}
+                max={24}
+                step={0.5}
+                value={f.newsFilter.windowAfter}
+                onChange={(e) =>
+                  setF((prev) => ({
+                    ...prev,
+                    newsFilter: {
+                      ...prev.newsFilter,
+                      windowAfter: parseFloat(e.target.value),
+                    },
+                  }))
+                }
+              />
+            </div>
           </div>
         )}
       </Section>

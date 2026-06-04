@@ -19,6 +19,22 @@ export interface Trade {
   currentPrice?: number
 }
 
+export interface Candle {
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+}
+
+export interface AccountSnapshot {
+  id: string
+  balance: number
+  equity: number
+  margin: number
+  timestamp: number
+}
+
 export interface Signal {
   id: string
   timestamp: number

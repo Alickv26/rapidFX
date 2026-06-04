@@ -1,6 +1,6 @@
 import { detectPatterns } from './pattern-detector.js'
 import { calculateSLTP, calculateVolume, canOpenTrade, checkTrailingStop } from './risk-manager.js'
-import { loadActiveStrategies, writeSignal, writeTrade, updateTrade, writeAuditLog, updateSignal, getTradeByTicket } from './firestore-client.js'
+import { loadActiveStrategies, writeSignal, writeTrade, updateTrade, writeAuditLog, updateSignal, getTradeByTicket, getUpcomingNews, writeCandles } from './firestore-client.js'
 import type {
   EAHeartbeat,
   StrategyConfig,
@@ -8,6 +8,7 @@ import type {
   TradeCommand,
   Position,
   Trade,
+  NewsEvent,
 } from './types.js'
 
 interface CommandMeta {
@@ -73,6 +74,52 @@ function normalizeSymbol(s: string): string {
   return s.replace('/', '')
 }
 
+function extractCurrencies(pairs: string[]): string[] {
+  return [...new Set(pairs.flatMap((p) => p.split('/')))]
+}
+
+const IMPACT_ORDER: Record<string, number> = { low: 1, medium: 2, high: 3 }
+
+async function checkNewsFilter(
+  strategy: StrategyConfig,
+  heartbeatTimestamp: number
+): Promise<boolean> {
+  if (!strategy.newsFilter.enabled) return true
+
+  const windowMs = strategy.newsFilter.windowBefore * 60 * 60 * 1000
+  const afterMs = strategy.newsFilter.windowAfter * 60 * 60 * 1000
+  const start = heartbeatTimestamp * 1000 - afterMs
+  const end = start + windowMs + afterMs
+
+  const events = await getUpcomingNews(start, end)
+  if (events.length === 0) return true
+
+  const currencies = extractCurrencies(strategy.pairs)
+  const minLevel = IMPACT_ORDER[strategy.newsFilter.minImpact]
+
+  for (const ev of events) {
+    if (!currencies.includes(ev.currency)) continue
+    if ((IMPACT_ORDER[ev.impact.toLowerCase()] ?? 0) >= minLevel) {
+      return false
+    }
+  }
+  return true
+}
+
+const lastSyncedCandle = new Map<string, number>()
+
+function syncCandlesToFirestore(symbol: string, symbolData: { rates?: Candle[] }): void {
+  if (!symbolData.rates || symbolData.rates.length < 2) return
+  const lastCandle = symbolData.rates[symbolData.rates.length - 1]
+  if (!lastCandle) return
+
+  const lastSync = lastSyncedCandle.get(symbol) || 0
+  if (lastCandle.time > lastSync) {
+    lastSyncedCandle.set(symbol, lastCandle.time)
+    writeCandles(symbol, getCandles(symbol).slice(-100))
+  }
+}
+
 export async function evaluateAll(
   heartbeat: EAHeartbeat
 ): Promise<void> {
@@ -86,21 +133,26 @@ export async function evaluateAll(
     : 0
 
   for (const strategy of strategies) {
-    if (accountDrawdown >= strategy.drawdownLimit) {
-      await writeAuditLog({
-        uid: strategy.uid,
-        action: 'drawdown_halt',
-        details: {
-          strategyId: strategy.id,
-          drawdown: accountDrawdown.toFixed(2),
-          limit: strategy.drawdownLimit,
-        },
-        timestamp: Date.now(),
-      })
-      continue
-    }
+      if (accountDrawdown >= strategy.drawdownLimit) {
+        await writeAuditLog({
+          uid: strategy.uid,
+          action: 'drawdown_halt',
+          details: {
+            strategyId: strategy.id,
+            drawdown: accountDrawdown.toFixed(2),
+            limit: strategy.drawdownLimit,
+          },
+          timestamp: Date.now(),
+        })
+        continue
+      }
 
-    const strategySymbols = new Set(strategy.pairs.map(normalizeSymbol))
+      if (!(await checkNewsFilter(strategy, heartbeat.time))) {
+        console.log(`[NEWS] ${strategy.name} — paused (news filter active)`)
+        continue
+      }
+
+      const strategySymbols = new Set(strategy.pairs.map(normalizeSymbol))
 
     for (const [symbol, data] of Object.entries(heartbeat.symbols)) {
       if (!strategySymbols.has(symbol)) continue
@@ -115,6 +167,7 @@ export async function evaluateAll(
 
       const rates = data.rates
       storeCandles(symbol, rates)
+      syncCandlesToFirestore(symbol, data)
 
       if (data.rates && data.rates.length >= 2) {
         console.log(`[EVAL] ${symbol} rates=${data.rates.length}`)
