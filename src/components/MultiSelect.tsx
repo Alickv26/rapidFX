@@ -89,7 +89,6 @@ export function MultiSelect({ selected, onChange }: MultiSelectProps) {
           {groups.map((group) => {
             const groupOptions = FOREX_PAIRS.filter((o) => o.group === group)
             const allSelected = groupOptions.every((o) => selected.includes(o.value))
-            const someSelected = groupOptions.some((o) => selected.includes(o.value))
             return (
               <div key={group}>
                 <div className="px-3 py-2 text-xs font-semibold text-surface-400 uppercase tracking-wider bg-surface-200/50 flex items-center justify-between">

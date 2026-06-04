@@ -1,24 +1,35 @@
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { usePaperMode } from '../contexts/PaperModeContext'
-import { DollarSign, TrendingUp, TrendingDown, Activity, BarChart3 } from 'lucide-react'
-
-const stats = [
-  { label: 'Balance', value: '$10,000.00', icon: DollarSign, color: 'text-brand-400' },
-  { label: 'Open P&L', value: '+$124.50', icon: TrendingUp, color: 'text-green-400' },
-  { label: 'Win Rate', value: '67%', icon: BarChart3, color: 'text-brand-400' },
-  { label: 'Open Trades', value: '3', icon: Activity, color: 'text-amber-400' },
-  { label: 'Drawdown', value: '-2.1%', icon: TrendingDown, color: 'text-red-400' },
-]
-
-const openTrades = [
-  { pair: 'EUR/USD', direction: 'LONG', entry: 1.0542, current: 1.0568, pips: 26, pnl: '+$32.50' },
-  { pair: 'GBP/JPY', direction: 'SHORT', entry: 189.45, current: 188.92, pips: 53, pnl: '+$67.20' },
-  { pair: 'USD/MXN', direction: 'LONG', entry: 20.15, current: 20.08, pips: -7, pnl: '-$8.75' },
-]
+import { DollarSign, TrendingUp, BarChart3, Activity, Zap } from 'lucide-react'
+import { subscribeOpenTrades, subscribeSignals } from '../lib/firestore'
+import type { Trade, Signal } from '../types/trade'
 
 export function DashboardPage() {
   const { user } = useAuth()
   const { paperMode } = usePaperMode()
+  const [trades, setTrades] = useState<Trade[]>([])
+  const [signals, setSignals] = useState<Signal[]>([])
+
+  useEffect(() => {
+    if (!user) return
+    const unsubTrades = subscribeOpenTrades(user.uid, setTrades)
+    const unsubSignals = subscribeSignals(user.uid, setSignals, 5)
+    return () => { unsubTrades(); unsubSignals() }
+  }, [user])
+
+  const openTrades = trades.filter((t) => t.status === 'open')
+  const closedTrades = trades.filter((t) => t.status === 'closed')
+  const wins = closedTrades.filter((t) => (t.pnl ?? 0) > 0).length
+  const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0)
+  const winRate = closedTrades.length > 0 ? ((wins / closedTrades.length) * 100).toFixed(0) : '—'
+
+  const stats = [
+    { label: 'Balance', value: paperMode ? '$100,000.00' : '—', icon: DollarSign, color: 'text-brand-400' },
+    { label: 'Win Rate', value: `${winRate}%`, icon: BarChart3, color: 'text-brand-400' },
+    { label: 'Open Trades', value: String(openTrades.length), icon: Activity, color: 'text-amber-400' },
+    { label: 'Total P&L', value: totalPnl >= 0 ? `+$${totalPnl.toFixed(2)}` : `-$${Math.abs(totalPnl).toFixed(2)}`, icon: TrendingUp, color: totalPnl >= 0 ? 'text-green-400' : 'text-red-400' },
+  ]
 
   return (
     <div className="space-y-8">
@@ -29,76 +40,122 @@ export function DashboardPage() {
             Welcome back, {user?.email?.split('@')[0]}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            paperMode ? 'bg-amber-500/10 text-amber-400' : 'bg-green-500/10 text-green-400'
-          }`}>
-            {paperMode ? 'PAPER' : 'LIVE'}
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${paperMode ? 'bg-amber-900/30 text-amber-400' : 'bg-surface-800 text-surface-400'}`}>
+            <Zap className="w-3 h-3" />
+            {paperMode ? 'Paper Trading' : 'Live Mode'}
           </span>
-          <button className="btn-primary text-sm">Start Bot</button>
+          <button className="btn btn-primary text-sm">
+            Start Bot
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {stats.map((s) => (
-          <div key={s.label} className="card">
-            <div className="flex items-center gap-2 mb-3">
-              <s.icon size={18} className={s.color} />
-              <span className="text-xs text-surface-400 font-medium">{s.label}</span>
+          <div key={s.label} className="card p-4 flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg bg-surface-800 flex items-center justify-center ${s.color}`}>
+              <s.icon className="w-5 h-5" />
             </div>
-            <p className="text-xl font-bold">{s.value}</p>
+            <div>
+              <p className="text-xs text-surface-400">{s.label}</p>
+              <p className="text-lg font-semibold">{s.value}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="font-semibold mb-4">Open Trades</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-surface-400 border-b border-surface-200">
-                  <th className="text-left pb-2 font-medium">Pair</th>
-                  <th className="text-left pb-2 font-medium">Dir</th>
-                  <th className="text-right pb-2 font-medium">Entry</th>
-                  <th className="text-right pb-2 font-medium">Current</th>
-                  <th className="text-right pb-2 font-medium">Pips</th>
-                  <th className="text-right pb-2 font-medium">P&L</th>
-                  <th className="text-right pb-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {openTrades.map((t) => (
-                  <tr key={t.pair} className="border-b border-surface-200/50">
-                    <td className="py-3 font-medium">{t.pair}</td>
-                    <td className={t.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}>
-                      {t.direction}
-                    </td>
-                    <td className="text-right text-surface-500">{t.entry}</td>
-                    <td className="text-right text-surface-500">{t.current}</td>
-                    <td className={`text-right font-medium ${t.pips > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {t.pips > 0 ? '+' : ''}{t.pips}
-                    </td>
-                    <td className={`text-right font-medium ${t.pnl.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
-                      {t.pnl}
-                    </td>
-                    <td className="text-right">
-                      <button className="text-xs text-red-400 hover:text-red-300">Close</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {openTrades.length === 0 && signals.length === 0 ? (
+        <div className="card p-8 text-center text-surface-400">
+          <Activity className="w-8 h-8 mx-auto mb-3 opacity-40" />
+          <p>No active trades or signals yet.</p>
+          <p className="text-sm mt-1">Create a strategy and activate it — the bot engine will detect patterns automatically.</p>
         </div>
+      ) : (
+        <>
+          {openTrades.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Open Trades</h2>
+              <div className="card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
+                      <th className="text-left p-3">Pair</th>
+                      <th className="text-left p-3">Direction</th>
+                      <th className="text-right p-3">Entry</th>
+                      <th className="text-right p-3">Current</th>
+                      <th className="text-right p-3">SL</th>
+                      <th className="text-right p-3">TP</th>
+                      <th className="text-right p-3">Pips</th>
+                      <th className="text-right p-3">P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openTrades.map((t) => (
+                      <tr key={t.id} className="border-b border-surface-700/50">
+                        <td className="p-3 font-medium">{t.pair}</td>
+                        <td className="p-3">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                            {t.direction === 'buy' ? 'LONG' : 'SHORT'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono">{t.openPrice.toFixed(5)}</td>
+                        <td className="p-3 text-right font-mono">—</td>
+                        <td className="p-3 text-right font-mono text-red-400">{t.sl.toFixed(5)}</td>
+                        <td className="p-3 text-right font-mono text-green-400">{t.tp.toFixed(5)}</td>
+                        <td className="p-3 text-right font-mono">{t.pips ?? '—'}</td>
+                        <td className={`p-3 text-right font-mono ${(t.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {t.pnl != null ? `$${t.pnl.toFixed(2)}` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-        <div className="card">
-          <h2 className="font-semibold mb-4">Equity Curve</h2>
-          <div className="h-48 flex items-center justify-center text-surface-400 text-sm border-2 border-dashed border-surface-200 rounded-lg">
-            Chart placeholder — TradingView Lightweight Charts coming next phase
-          </div>
-        </div>
-      </div>
+          {signals.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Recent Signals</h2>
+              <div className="card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
+                      <th className="text-left p-3">Time</th>
+                      <th className="text-left p-3">Pair</th>
+                      <th className="text-left p-3">Direction</th>
+                      <th className="text-left p-3">Patterns</th>
+                      <th className="text-right p-3">Price</th>
+                      <th className="text-center p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {signals.map((s) => (
+                      <tr key={s.id} className="border-b border-surface-700/50">
+                        <td className="p-3 text-surface-400">{new Date(s.timestamp).toLocaleTimeString()}</td>
+                        <td className="p-3 font-medium">{s.pair}</td>
+                        <td className="p-3">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${s.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                            {s.direction === 'buy' ? 'BUY' : 'SELL'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-surface-400">{s.patterns.join(', ')}</td>
+                        <td className="p-3 text-right font-mono">{s.price.toFixed(5)}</td>
+                        <td className="p-3 text-center">
+                          <span className={`text-xs px-2 py-0.5 rounded ${s.executed ? 'bg-green-900/30 text-green-400' : 'bg-surface-700 text-surface-400'}`}>
+                            {s.executed ? 'Executed' : 'Pending'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
