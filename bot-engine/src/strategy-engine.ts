@@ -1,6 +1,6 @@
 import { detectPatterns } from './pattern-detector.js'
 import { calculateSLTP, calculateVolume, canOpenTrade, checkTrailingStop } from './risk-manager.js'
-import { loadActiveStrategies, writeSignal, writeTrade, updateTrade, writeAuditLog, updateSignal } from './firestore-client.js'
+import { loadActiveStrategies, writeSignal, writeTrade, updateTrade, writeAuditLog, updateSignal, getTradeByTicket } from './firestore-client.js'
 import type {
   EAHeartbeat,
   StrategyConfig,
@@ -10,7 +10,20 @@ import type {
   Trade,
 } from './types.js'
 
+interface CommandMeta {
+  signalId: string
+  pairDisplay: string
+  strategyId: string
+  uid: string
+  direction: 'buy' | 'sell'
+  volume: number
+  sl: number
+  tp: number
+  entryPrice: number
+}
+
 const pendingCommands: TradeCommand[] = []
+const commandMeta = new Map<string, CommandMeta>()
 const candleStore = new Map<string, Candle[]>()
 const MAX_CANDLES = 100
 
@@ -189,6 +202,17 @@ export async function evaluateAll(
         sl,
         tp,
       })
+      commandMeta.set(cmdId, {
+        signalId,
+        pairDisplay,
+        strategyId: strategy.id,
+        uid: strategy.uid,
+        direction: tradeDir,
+        volume,
+        sl,
+        tp,
+        entryPrice,
+      })
 
       console.log(`[${symbol}] SIGNAL ${detected.join(',')} → ${tradeDir.toUpperCase()} @ ${entryPrice}`)
     }
@@ -203,15 +227,44 @@ export async function handleTradeResult(
   heartbeatTimestamp: number,
   accountBalance: number
 ): Promise<void> {
-  if (success) {
-    const match = commandId.match(/cmd_\d+_(.+)/)
-    const pair = match ? match[1] : 'UNKNOWN'
+  const meta = commandMeta.get(commandId)
+  commandMeta.delete(commandId)
 
+  if (success && meta) {
+    const tradeData: Omit<Trade, 'id'> = {
+      uid: meta.uid,
+      strategyId: meta.strategyId,
+      ticket,
+      pair: meta.pairDisplay,
+      direction: meta.direction,
+      volume: meta.volume,
+      openPrice: meta.entryPrice,
+      closePrice: null,
+      sl: meta.sl,
+      tp: meta.tp,
+      openTime: Date.now(),
+      closeTime: null,
+      pnl: null,
+      pips: null,
+      status: 'open',
+      reason: 'signal',
+    }
+
+    const tradeId = await writeTrade(tradeData)
+    await updateSignal(meta.signalId, { executed: true, tradeId })
+
+    await writeAuditLog({
+      uid: meta.uid,
+      action: 'trade_opened',
+      details: { commandId, ticket, pair: meta.pairDisplay, signalId: meta.signalId },
+      timestamp: Date.now(),
+    })
+  } else if (success && !meta) {
     const tradeData: Omit<Trade, 'id'> = {
       uid: 'bot',
       strategyId: 'unknown',
       ticket,
-      pair,
+      pair: 'UNKNOWN',
       direction: 'buy',
       volume: 0.01,
       openPrice: 0,
@@ -225,7 +278,6 @@ export async function handleTradeResult(
       status: 'open',
       reason: 'signal',
     }
-
     await writeTrade(tradeData)
     await writeAuditLog({
       uid: 'bot',
@@ -235,9 +287,9 @@ export async function handleTradeResult(
     })
   } else {
     await writeAuditLog({
-      uid: 'bot',
+      uid: meta?.uid ?? 'bot',
       action: 'trade_error',
-      details: { commandId, error },
+      details: { commandId, error, signalId: meta?.signalId },
       timestamp: Date.now(),
     })
   }
@@ -284,12 +336,51 @@ export async function handlePositionClosed(
   profit: number,
   pips: number
 ): Promise<void> {
-  await writeAuditLog({
-    uid: 'bot',
-    action: 'trade_closed',
-    details: { ticket, closePrice: price, profit, pips },
-    timestamp: Date.now(),
-  })
+  const trade = await getTradeByTicket(ticket)
+  if (trade) {
+    await updateTrade(trade.id, {
+      closePrice: price || null,
+      pnl: profit || null,
+      pips: pips || null,
+      closeTime: Date.now(),
+      status: 'closed',
+    })
+    await writeAuditLog({
+      uid: trade.uid,
+      action: 'trade_closed',
+      details: { ticket, closePrice: price, profit, pips, tradeId: trade.id },
+      timestamp: Date.now(),
+    })
+  } else {
+    await writeAuditLog({
+      uid: 'bot',
+      action: 'trade_closed',
+      details: { ticket, closePrice: price, profit, pips },
+      timestamp: Date.now(),
+    })
+  }
+}
+
+export async function syncPositionsToTrades(
+  heartbeat: EAHeartbeat
+): Promise<void> {
+  for (const position of heartbeat.positions) {
+    const trade = await getTradeByTicket(position.ticket)
+    if (!trade) continue
+
+    const symbolData = heartbeat.symbols[position.symbol]
+    const currentPrice = position.type === 0
+      ? symbolData?.bid
+      : symbolData?.ask
+
+    const updates: Partial<Trade> = {
+      pnl: position.profit || null,
+    }
+    if (currentPrice) {
+      updates.currentPrice = currentPrice
+    }
+    await updateTrade(trade.id, updates)
+  }
 }
 
 export function getCachedData(): {

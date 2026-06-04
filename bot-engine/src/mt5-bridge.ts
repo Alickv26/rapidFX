@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
-import { evaluateAll, getPendingCommands, handleTradeResult, handlePositionClosed, getCachedData } from './strategy-engine.js'
+import { evaluateAll, getPendingCommands, handleTradeResult, handlePositionClosed, getCachedData, syncPositionsToTrades } from './strategy-engine.js'
 import type { EAHeartbeat, TradeResult } from './types.js'
 
 export function createRouter() {
@@ -19,6 +19,12 @@ export function createRouter() {
       setImmediate(() => {
         evaluateAll(heartbeat).catch((err) =>
           console.error('Evaluation error:', err)
+        )
+      })
+
+      setImmediate(() => {
+        syncPositionsToTrades(heartbeat).catch((err) =>
+          console.error('Position sync error:', err)
         )
       })
 

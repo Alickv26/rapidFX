@@ -127,6 +127,7 @@ export interface Trade {
   pips: number | null
   status: 'open' | 'closed'
   reason: string
+  currentPrice?: number
 }
 
 export interface ATRResult {

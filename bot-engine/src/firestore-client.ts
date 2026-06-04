@@ -54,6 +54,18 @@ export async function loadStrategy(id: string): Promise<StrategyConfig | null> {
   return { id: snap.id, ...snap.data() } as StrategyConfig
 }
 
+export async function getTradeByTicket(ticket: number): Promise<Trade | null> {
+  const firestore = getFirestore()
+  const snap = await firestore.collection('trades')
+    .where('ticket', '==', ticket)
+    .where('status', '==', 'open')
+    .limit(1)
+    .get()
+  if (snap.empty) return null
+  const d = snap.docs[0]
+  return { id: d.id, ...d.data() } as Trade
+}
+
 export async function writeTrade(trade: Omit<Trade, 'id'>): Promise<string> {
   const firestore = getFirestore()
   const ref = await firestore.collection('trades').add(trade)

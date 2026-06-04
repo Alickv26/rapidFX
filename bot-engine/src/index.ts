@@ -2,6 +2,10 @@ import express from 'express'
 import cors from 'cors'
 import { createRouter } from './mt5-bridge.js'
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason)
+})
+
 const PORT = parseInt(process.env.PORT || '3001', 10)
 
 const app = express()

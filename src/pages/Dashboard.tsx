@@ -100,7 +100,7 @@ export function DashboardPage() {
                           </span>
                         </td>
                         <td className="p-3 text-right font-mono">{t.openPrice.toFixed(5)}</td>
-                        <td className="p-3 text-right font-mono">—</td>
+                        <td className="p-3 text-right font-mono">{t.currentPrice ? t.currentPrice.toFixed(5) : '—'}</td>
                         <td className="p-3 text-right font-mono text-red-400">{t.sl.toFixed(5)}</td>
                         <td className="p-3 text-right font-mono text-green-400">{t.tp.toFixed(5)}</td>
                         <td className="p-3 text-right font-mono">{t.pips ?? '—'}</td>
