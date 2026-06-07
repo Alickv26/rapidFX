@@ -78,6 +78,17 @@ export function subscribeTrades(uid: string, cb: (trades: Trade[]) => void): Uns
   })
 }
 
+export function subscribeAllTrades(uid: string, cb: (trades: Trade[]) => void): Unsubscribe {
+  const q = query(
+    collection(db, TRADES),
+    where('uid', '==', uid),
+    orderBy('openTime', 'desc')
+  )
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trade)))
+  })
+}
+
 export function subscribeOpenTrades(uid: string, cb: (trades: Trade[]) => void): Unsubscribe {
   const q = query(
     collection(db, TRADES),
@@ -136,6 +147,15 @@ export function subscribeCandles(symbol: string, cb: (candles: Candle[]) => void
     } else {
       cb([])
     }
+  })
+}
+
+// ── Strategies (realtime) ──
+
+export function subscribeStrategies(uid: string, cb: (strategies: Strategy[]) => void): Unsubscribe {
+  const q = query(collection(db, STRATEGIES), where('uid', '==', uid))
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Strategy)))
   })
 }
 

@@ -7,6 +7,7 @@ import {
   FlaskConical,
   Activity,
   Newspaper,
+  BarChart3,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { usePaperMode } from '../contexts/PaperModeContext'
@@ -15,6 +16,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/strategies', icon: Settings, label: 'Strategies' },
   { to: '/trades', icon: Activity, label: 'Trades' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/backtest', icon: FlaskConical, label: 'Backtest' },
   { to: '/audit', icon: ScrollText, label: 'Audit Log' },
   { to: '/news', icon: Newspaper, label: 'News' },

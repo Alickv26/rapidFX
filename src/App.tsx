@@ -10,6 +10,7 @@ import { StrategiesPage } from "./pages/Strategies";
 import { StrategyCreatePage } from "./pages/StrategyCreate";
 import { StrategyEditPage } from "./pages/StrategyEdit";
 import { TradesPage } from "./pages/Trades";
+import { AnalyticsPage } from "./pages/Analytics";
 import { BacktestPage } from "./pages/Backtest";
 import { AuditLogPage } from "./pages/AuditLog";
 import { NewsCalendarPage } from "./pages/NewsCalendar";
@@ -96,6 +97,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TradesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <AnalyticsPage />
           </ProtectedRoute>
         }
       />
