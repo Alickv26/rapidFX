@@ -150,6 +150,12 @@ export function subscribeCandles(symbol: string, cb: (candles: Candle[]) => void
   })
 }
 
+export async function getHistoricalCandles(symbol: string): Promise<Candle[]> {
+  const snap = await getDoc(doc(db, CANDLES, symbol))
+  if (!snap.exists()) return []
+  return (snap.data().candles as Candle[]) || []
+}
+
 // ── Strategies (realtime) ──
 
 export function subscribeStrategies(uid: string, cb: (strategies: Strategy[]) => void): Unsubscribe {

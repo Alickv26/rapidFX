@@ -34,7 +34,7 @@ interface CommandMeta {
 const pendingCommands: TradeCommand[] = []
 const commandMeta = new Map<string, CommandMeta>()
 const candleStore = new Map<string, Candle[]>()
-const MAX_CANDLES = 100
+const MAX_CANDLES = 2000
 
 function candleKey(symbol: string, timeframe: string): string {
   return `${symbol}:${timeframe}`
