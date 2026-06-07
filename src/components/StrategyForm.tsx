@@ -100,7 +100,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
   return (
     <form onSubmit={submit} className="space-y-6">
       <Section title="Basic Info">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label" htmlFor="name">
               Strategy Name
@@ -133,7 +133,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
       </Section>
 
       <Section title="Market Selection">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label">Forex Pairs</label>
             <MultiSelect
@@ -143,7 +143,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
           </div>
           <div>
             <label className="label">Timeframes</label>
-            <div className="grid grid-cols-4 gap-2 mt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
               {ALL_TIMEFRAMES.map((tf) => (
                 <label
                   key={tf}
@@ -176,7 +176,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
       </Section>
 
       <Section title="Price Action Patterns">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(["pinBar", "engulfing", "insideBar", "doji"] as const).map((p) => (
             <label
               key={p}
@@ -229,7 +229,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
       </Section>
 
       <Section title="Risk Management">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label" htmlFor="slType">
               Stop Loss Type
@@ -330,7 +330,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
             }
           />
           {f.risk.trailingStop && (
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <label className="label" htmlFor="trailDist">
                 Trail Distance
               </label>

@@ -202,7 +202,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {stats.map((s) => (
           <div key={s.label} className="card p-4 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-lg bg-surface-800 flex items-center justify-center ${s.color}`}>
@@ -244,7 +244,7 @@ export function DashboardPage() {
           {openTrades.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold mb-3">Open Trades</h2>
-              <div className="card overflow-hidden">
+              <div className="card overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
@@ -286,7 +286,7 @@ export function DashboardPage() {
           {signals.length > 0 && (
             <div>
               <h2 className="text-lg font-semibold mb-3">Recent Signals</h2>
-              <div className="card overflow-hidden">
+              <div className="card overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">

@@ -131,7 +131,7 @@ export function BacktestPage() {
       </div>
 
       <div className="card p-6">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-medium text-surface-400 mb-1">Strategy</label>
             <select
@@ -236,7 +236,7 @@ export function BacktestPage() {
 
       {result && result.totalTrades > 0 && (
         <>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {[
               { label: 'Total P&L', value: formatPnl(result.totalPnl), color: result.totalPnl >= 0 ? 'text-green-400' : 'text-red-400', icon: DollarSign },
               { label: 'Win Rate', value: `${result.winRate.toFixed(1)}%`, color: 'text-brand-400', icon: TrendingUp },
@@ -298,7 +298,7 @@ export function BacktestPage() {
                 CSV
               </button>
             </div>
-            <div className="card overflow-hidden">
+            <div className="card overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">

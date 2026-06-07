@@ -154,7 +154,7 @@ export function NewsCalendarPage() {
           <p className="text-sm mt-1">Try adjusting the filters above — {totalCount} events available.</p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">

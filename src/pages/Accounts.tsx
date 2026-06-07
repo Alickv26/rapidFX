@@ -92,7 +92,7 @@ export function AccountsPage() {
       {showForm && (
         <div className="card p-6 space-y-4">
           <h3 className="font-semibold">New Account</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label" htmlFor="acc-label">Account Label</label>
               <input
@@ -165,8 +165,8 @@ export function AccountsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-xs text-surface-400 bg-surface-800 px-3 py-1.5 rounded-lg">
-                    <code className="text-surface-200">{acc.apiKey}</code>
+                  <div className="flex items-center gap-1.5 text-xs text-surface-400 bg-surface-800 px-3 py-1.5 rounded-lg max-w-[160px] sm:max-w-none">
+                    <code className="text-surface-200 truncate">{acc.apiKey}</code>
                     <button
                       onClick={() => copyKey(acc.apiKey, acc.id)}
                       className="p-0.5 hover:text-surface-200 transition-colors"

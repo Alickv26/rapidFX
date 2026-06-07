@@ -260,7 +260,7 @@ export function AnalyticsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {summaryCards.map((c) => (
           <div key={c.label} className="card p-4 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-lg bg-surface-800 flex items-center justify-center ${c.color}`}>
@@ -359,8 +359,8 @@ export function AnalyticsPage() {
 
       <div>
         <h2 className="text-sm font-semibold text-surface-200 mb-3">Top Trades</h2>
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="card overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
                 <th className="text-left p-3">Time</th>

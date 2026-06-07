@@ -28,7 +28,7 @@ export function TradesPage() {
           No trades yet. Signals will appear here once the bot engine executes them.
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
