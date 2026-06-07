@@ -6,6 +6,7 @@ import {
   deleteDoc,
   getDocs,
   getDoc,
+  setDoc,
   query,
   where,
   orderBy,
@@ -149,4 +150,36 @@ export function subscribeAccountSnapshots(uid: string, cb: (snapshots: AccountSn
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AccountSnapshot)))
   })
+}
+
+// ── Paper Mode ──
+
+export function subscribePaperMode(uid: string, cb: (paperMode: boolean) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'users', uid, 'settings', 'default'), (snap) => {
+    cb(snap.exists() ? (snap.data().paperMode ?? true) : true)
+  })
+}
+
+export function subscribePaperSettings(
+  uid: string,
+  cb: (settings: { paperMode: boolean; paperBalance: number }) => void,
+): Unsubscribe {
+  return onSnapshot(doc(db, 'users', uid, 'settings', 'default'), (snap) => {
+    if (snap.exists()) {
+      const d = snap.data()
+      cb({ paperMode: d.paperMode ?? true, paperBalance: d.paperBalance ?? 100000 })
+    } else {
+      cb({ paperMode: true, paperBalance: 100000 })
+    }
+  })
+}
+
+export async function setPaperMode(uid: string, enabled: boolean): Promise<void> {
+  await setDoc(doc(db, 'users', uid, 'settings', 'default'), { paperMode: enabled }, { merge: true })
+}
+
+export async function getPaperBalance(uid: string): Promise<number> {
+  const snap = await getDoc(doc(db, 'users', uid, 'settings', 'default'))
+  if (!snap.exists()) return 100000
+  return snap.data().paperBalance ?? 100000
 }

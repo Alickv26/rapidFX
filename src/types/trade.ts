@@ -17,6 +17,7 @@ export interface Trade {
   status: 'open' | 'closed'
   reason: string
   currentPrice?: number
+  paper?: boolean
 }
 
 export interface Candle {

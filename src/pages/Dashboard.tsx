@@ -7,6 +7,7 @@ import {
   subscribeSignals,
   subscribeAccountSnapshots,
   subscribeCandles,
+  subscribePaperSettings,
 } from '../lib/firestore'
 import type { Trade, Signal, AccountSnapshot, Candle } from '../types/trade'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -141,13 +142,15 @@ export function DashboardPage() {
   const [signals, setSignals] = useState<Signal[]>([])
   const [snapshots, setSnapshots] = useState<AccountSnapshot[]>([])
   const [chartSymbol, setChartSymbol] = useState<string>(PAIRS[0])
+  const [paperSettings, setPaperSettings] = useState<{ paperMode: boolean; paperBalance: number } | null>(null)
 
   useEffect(() => {
     if (!user) return
     const unsubTrades = subscribeOpenTrades(user.uid, setTrades)
     const unsubSignals = subscribeSignals(user.uid, setSignals, 5)
     const unsubSnapshots = subscribeAccountSnapshots(user.uid, setSnapshots)
-    return () => { unsubTrades(); unsubSignals(); unsubSnapshots() }
+    const unsubPaper = subscribePaperSettings(user.uid, setPaperSettings)
+    return () => { unsubTrades(); unsubSignals(); unsubSnapshots(); unsubPaper() }
   }, [user])
 
   const openTrades = trades.filter((t) => t.status === 'open')
@@ -156,9 +159,18 @@ export function DashboardPage() {
   const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0)
   const winRate = closedTrades.length > 0 ? ((wins / closedTrades.length) * 100).toFixed(0) : '—'
 
+  const openPnl = openTrades.reduce((s, t) => s + (t.pnl ?? 0), 0)
   const lastSnapshot = snapshots[snapshots.length - 1]
-  const balance = lastSnapshot ? `$${lastSnapshot.balance.toFixed(2)}` : paperMode ? '$100,000.00' : '—'
-  const openEquity = lastSnapshot ? `$${lastSnapshot.equity.toFixed(2)}` : '—'
+
+  const displayBalance = paperMode && paperSettings
+    ? paperSettings.paperBalance
+    : lastSnapshot?.balance ?? 0
+  const displayEquity = paperMode && paperSettings
+    ? paperSettings.paperBalance + openPnl
+    : lastSnapshot?.equity ?? 0
+
+  const balance = `$${displayBalance.toFixed(2)}`
+  const openEquity = `$${displayEquity.toFixed(2)}`
 
   const stats = [
     { label: 'Balance', value: balance, icon: DollarSign, color: 'text-brand-400' },

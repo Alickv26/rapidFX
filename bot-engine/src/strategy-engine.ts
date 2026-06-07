@@ -1,6 +1,14 @@
 import { detectPatterns } from './pattern-detector.js'
 import { calculateSLTP, calculateVolume, canOpenTrade, checkTrailingStop } from './risk-manager.js'
-import { loadActiveStrategies, writeSignal, writeTrade, updateTrade, writeAuditLog, updateSignal, getTradeByTicket, getUpcomingNews, writeCandles } from './firestore-client.js'
+import { loadActiveStrategies, writeSignal, writeTrade, updateTrade, writeAuditLog, updateSignal, getTradeByTicket, getUpcomingNews, writeCandles, loadUserSettings } from './firestore-client.js'
+import {
+  getPaperPositions,
+  getPaperPositionsForSymbol,
+  getPaperPositionsForStrategy,
+  executePaperTrade,
+  processPaperHeartbeat,
+  checkPaperTrailingStops,
+} from './paper-trader.js'
 import type {
   EAHeartbeat,
   StrategyConfig,
@@ -127,13 +135,32 @@ export async function evaluateAll(
   if (strategies.length === 0) return
 
   await checkTrailingStops(strategies, heartbeat)
+  await checkPaperTrailingStops(strategies, heartbeat, getCandles)
+
+  const userSettingsCache = new Map<string, { paperMode: boolean; paperBalance: number }>()
+
+  async function getSettings(uid: string) {
+    if (userSettingsCache.has(uid)) return userSettingsCache.get(uid)!
+    const s = await loadUserSettings(uid)
+    const result = s ?? { paperMode: true, paperBalance: 100000 }
+    userSettingsCache.set(uid, result)
+    return result
+  }
 
   const accountDrawdown = heartbeat.account.balance > 0
     ? ((heartbeat.account.balance - heartbeat.account.equity) / heartbeat.account.balance) * 100
     : 0
 
   for (const strategy of strategies) {
-      if (accountDrawdown >= strategy.drawdownLimit) {
+      const us = await getSettings(strategy.uid)
+      const paperMode = us.paperMode
+      const paperPnl = paperMode ? getPaperPositions().reduce((s, p) => s + p.pnl, 0) : 0
+      const paperEquity = paperMode ? us.paperBalance + paperPnl : 0
+      const effectiveDrawdown = paperMode && us.paperBalance > 0
+        ? Math.max(0, ((us.paperBalance - paperEquity) / us.paperBalance) * 100)
+        : accountDrawdown
+
+      if (effectiveDrawdown >= strategy.drawdownLimit) {
         await writeAuditLog({
           uid: strategy.uid,
           action: 'drawdown_halt',
@@ -158,9 +185,9 @@ export async function evaluateAll(
       if (!strategySymbols.has(symbol)) continue
       const pairDisplay = strategy.pairs.find((p) => normalizeSymbol(p) === symbol) ?? symbol
 
-      const hasOpenTrade = heartbeat.positions.some(
-        (p) => p.symbol === symbol
-      )
+      const hasOpenTrade = paperMode
+        ? getPaperPositionsForSymbol(symbol).length > 0
+        : heartbeat.positions.some((p) => p.symbol === symbol)
       if (hasOpenTrade) continue
 
       if (!data.rates || data.rates.length < 2) continue
@@ -194,22 +221,23 @@ export async function evaluateAll(
       )
 
       const volume = calculateVolume(
-        heartbeat.account.balance,
+        paperMode ? us.paperBalance : heartbeat.account.balance,
         entryPrice,
         sl,
         strategy.positionSizing.riskPerTrade
       )
 
-      const strategyPositions = heartbeat.positions.filter(
-        (p) => strategySymbols.has(p.symbol)
-      )
+      const paperPos = paperMode ? getPaperPositionsForStrategy(strategy.id) : []
+      const strategyPositions = paperMode
+        ? paperPos
+        : heartbeat.positions.filter((p) => strategySymbols.has(p.symbol))
 
       const riskCheck = canOpenTrade(
         strategy,
-        heartbeat.positions,
-        strategyPositions,
-        heartbeat.account.balance,
-        heartbeat.account.equity
+        [],
+        strategyPositions as Position[],
+        paperMode ? us.paperBalance : heartbeat.account.balance,
+        paperMode ? us.paperBalance + paperPos.reduce((s, p) => s + p.pnl, 0) : heartbeat.account.equity
       )
 
       if (!riskCheck.allowed) {
@@ -245,31 +273,37 @@ export async function evaluateAll(
         timestamp: Date.now(),
       })
 
-      const cmdId = `cmd_${Date.now()}_${symbol}`
-      pendingCommands.push({
-        id: cmdId,
-        action: 'open',
-        symbol,
-        type: tradeDir,
-        volume,
-        sl,
-        tp,
-      })
-      commandMeta.set(cmdId, {
-        signalId,
-        pairDisplay,
-        strategyId: strategy.id,
-        uid: strategy.uid,
-        direction: tradeDir,
-        volume,
-        sl,
-        tp,
-        entryPrice,
-      })
+      if (paperMode) {
+        await executePaperTrade(signalId, strategy, pairDisplay, tradeDir, entryPrice, volume, sl, tp)
+      } else {
+        const cmdId = `cmd_${Date.now()}_${symbol}`
+        pendingCommands.push({
+          id: cmdId,
+          action: 'open',
+          symbol,
+          type: tradeDir,
+          volume,
+          sl,
+          tp,
+        })
+        commandMeta.set(cmdId, {
+          signalId,
+          pairDisplay,
+          strategyId: strategy.id,
+          uid: strategy.uid,
+          direction: tradeDir,
+          volume,
+          sl,
+          tp,
+          entryPrice,
+        })
+      }
 
       console.log(`[${symbol}] SIGNAL ${detected.join(',')} → ${tradeDir.toUpperCase()} @ ${entryPrice}`)
     }
   }
+
+  await processPaperHeartbeat(heartbeat)
 }
 
 export async function handleTradeResult(

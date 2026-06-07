@@ -143,6 +143,24 @@ export interface Trade {
   status: 'open' | 'closed'
   reason: string
   currentPrice?: number
+  paper?: boolean
+}
+
+export interface PaperPosition {
+  ticket: number
+  tradeId: string
+  uid: string
+  strategyId: string
+  symbol: string
+  type: 'buy' | 'sell'
+  volume: number
+  openPrice: number
+  sl: number
+  tp: number
+  openTime: number
+  currentPrice: number
+  pnl: number
+  pips: number
 }
 
 export interface ATRResult {

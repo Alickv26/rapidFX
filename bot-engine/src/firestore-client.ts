@@ -131,3 +131,32 @@ export async function writeCandles(symbol: string, candles: Candle[]): Promise<v
     updatedAt: Date.now(),
   })
 }
+
+export async function loadUserSettings(uid: string): Promise<{
+  paperMode: boolean
+  paperBalance: number
+} | null> {
+  const firestore = getFirestore()
+  const snap = await firestore
+    .collection('users')
+    .doc(uid)
+    .collection('settings')
+    .doc('default')
+    .get()
+  if (!snap.exists) return null
+  const data = snap.data()!
+  return {
+    paperMode: data.paperMode ?? true,
+    paperBalance: data.paperBalance ?? 100000,
+  }
+}
+
+export async function updatePaperBalance(uid: string, balance: number): Promise<void> {
+  const firestore = getFirestore()
+  await firestore
+    .collection('users')
+    .doc(uid)
+    .collection('settings')
+    .doc('default')
+    .set({ paperBalance: balance }, { merge: true })
+}
