@@ -24,6 +24,7 @@ interface CommandMeta {
   pairDisplay: string
   strategyId: string
   uid: string
+  accountId: string
   direction: 'buy' | 'sell'
   volume: number
   sl: number
@@ -65,11 +66,16 @@ export function getPendingCommands(): TradeCommand[] {
 
 let lastStrategiesLoad = 0
 let cachedStrategies: StrategyConfig[] = []
+let strategiesAccountId: string | undefined
+
+export function setStrategiesAccountId(accountId?: string): void {
+  strategiesAccountId = accountId
+}
 
 async function getStrategies(): Promise<StrategyConfig[]> {
   if (Date.now() - lastStrategiesLoad > 30000) {
     lastStrategiesLoad = Date.now()
-    cachedStrategies = await loadActiveStrategies()
+    cachedStrategies = await loadActiveStrategies(strategiesAccountId)
   }
   return cachedStrategies
 }
@@ -286,17 +292,18 @@ export async function evaluateAll(
           sl,
           tp,
         })
-        commandMeta.set(cmdId, {
-          signalId,
-          pairDisplay,
-          strategyId: strategy.id,
-          uid: strategy.uid,
-          direction: tradeDir,
-          volume,
-          sl,
-          tp,
-          entryPrice,
-        })
+          commandMeta.set(cmdId, {
+            signalId,
+            pairDisplay,
+            strategyId: strategy.id,
+            uid: strategy.uid,
+            accountId: strategy.accountId ?? '',
+            direction: tradeDir,
+            volume,
+            sl,
+            tp,
+            entryPrice,
+          })
       }
 
       console.log(`[${symbol}] SIGNAL ${detected.join(',')} → ${tradeDir.toUpperCase()} @ ${entryPrice}`)
@@ -318,24 +325,25 @@ export async function handleTradeResult(
   commandMeta.delete(commandId)
 
   if (success && meta) {
-    const tradeData: Omit<Trade, 'id'> = {
-      uid: meta.uid,
-      strategyId: meta.strategyId,
-      ticket,
-      pair: meta.pairDisplay,
-      direction: meta.direction,
-      volume: meta.volume,
-      openPrice: meta.entryPrice,
-      closePrice: null,
-      sl: meta.sl,
-      tp: meta.tp,
-      openTime: Date.now(),
-      closeTime: null,
-      pnl: null,
-      pips: null,
-      status: 'open',
-      reason: 'signal',
-    }
+      const tradeData: Omit<Trade, 'id'> = {
+        uid: meta.uid,
+        accountId: meta.accountId,
+        strategyId: meta.strategyId,
+        ticket,
+        pair: meta.pairDisplay,
+        direction: meta.direction,
+        volume: meta.volume,
+        openPrice: meta.entryPrice,
+        closePrice: null,
+        sl: meta.sl,
+        tp: meta.tp,
+        openTime: Date.now(),
+        closeTime: null,
+        pnl: null,
+        pips: null,
+        status: 'open',
+        reason: 'signal',
+      }
 
     const tradeId = await writeTrade(tradeData)
     await updateSignal(meta.signalId, { executed: true, tradeId })
@@ -348,9 +356,10 @@ export async function handleTradeResult(
     })
   } else if (success && !meta) {
     const tradeData: Omit<Trade, 'id'> = {
-      uid: 'bot',
-      strategyId: 'unknown',
-      ticket,
+        uid: 'bot',
+        accountId: '',
+        strategyId: 'unknown',
+        ticket,
       pair: 'UNKNOWN',
       direction: 'buy',
       volume: 0.01,

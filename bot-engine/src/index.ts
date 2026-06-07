@@ -2,12 +2,18 @@ import express from 'express'
 import cors from 'cors'
 import { createRouter } from './mt5-bridge.js'
 import { refreshNewsCalendar, RateLimitError } from './news/forexfactory.js'
+import { setStrategiesAccountId } from './strategy-engine.js'
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason)
 })
 
 const PORT = parseInt(process.env.PORT || '3001', 10)
+const ACCOUNT_ID = process.env.ACCOUNT_ID || ''
+if (ACCOUNT_ID) {
+  setStrategiesAccountId(ACCOUNT_ID)
+  console.log(`[MULTI-ACCOUNT] Filtering strategies for account: ${ACCOUNT_ID}`)
+}
 
 const app = express()
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 import { subscribeAllTrades, subscribeStrategies } from '../lib/firestore'
 import type { Trade } from '../types/trade'
 import type { Strategy } from '../types/strategy'
@@ -189,15 +190,16 @@ function computeEquityCurve(closed: Trade[]) {
 
 export function AnalyticsPage() {
   const { user } = useAuth()
+  const { activeAccount } = useAccount()
   const [trades, setTrades] = useState<Trade[]>([])
   const [strategies, setStrategies] = useState<Strategy[]>([])
 
   useEffect(() => {
     if (!user) return
-    const unsubTrades = subscribeAllTrades(user.uid, setTrades)
-    const unsubStrategies = subscribeStrategies(user.uid, setStrategies)
+    const unsubTrades = subscribeAllTrades(user.uid, setTrades, activeAccount?.id)
+    const unsubStrategies = subscribeStrategies(user.uid, setStrategies, activeAccount?.id)
     return () => { unsubTrades(); unsubStrategies() }
-  }, [user])
+  }, [user, activeAccount?.id])
 
   const strategyMap = useMemo(
     () => new Map(strategies.map((s) => [s.id, s.name])),

@@ -1,6 +1,7 @@
 export interface Trade {
   id: string
   uid: string
+  accountId: string
   strategyId: string
   ticket: number
   pair: string
@@ -30,6 +31,7 @@ export interface Candle {
 
 export interface AccountSnapshot {
   id: string
+  accountId: string
   balance: number
   equity: number
   margin: number

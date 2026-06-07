@@ -37,9 +37,12 @@ export function setFirestoreForTesting(mockDb: Firestore): void {
   initialized = true
 }
 
-export async function loadActiveStrategies(): Promise<StrategyConfig[]> {
+export async function loadActiveStrategies(accountId?: string): Promise<StrategyConfig[]> {
   const firestore = getFirestore()
-  const snap = await firestore.collection('strategies').where('active', '==', true).get()
+  let query: FirebaseFirestore.Query = firestore.collection('strategies').where('active', '==', true)
+  if (accountId) query = query.where('accountId', '==', accountId)
+
+  const snap = await query.get()
 
   return snap.docs.map((d) => ({
     id: d.id,
@@ -100,11 +103,13 @@ export async function writeAuditLog(entry: {
 
 export async function updateAccountSnapshot(
   uid: string,
+  accountId: string,
   data: { balance: number; equity: number; margin: number }
 ): Promise<void> {
   const firestore = getFirestore()
   await firestore.collection('users').doc(uid).collection('accountSnapshots').add({
     ...data,
+    accountId,
     timestamp: Date.now(),
   })
 }
@@ -130,6 +135,21 @@ export async function writeCandles(symbol: string, candles: Candle[]): Promise<v
     candles,
     updatedAt: Date.now(),
   })
+}
+
+export async function updateAccountBalance(
+  uid: string,
+  accountId: string,
+  balance: number,
+  equity: number,
+): Promise<void> {
+  const firestore = getFirestore()
+  await firestore
+    .collection('users')
+    .doc(uid)
+    .collection('accounts')
+    .doc(accountId)
+    .set({ balance, equity, updatedAt: Date.now() }, { merge: true })
 }
 
 export async function loadUserSettings(uid: string): Promise<{

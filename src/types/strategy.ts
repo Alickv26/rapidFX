@@ -33,6 +33,7 @@ export type Direction = 'long' | 'short' | 'both'
 export interface Strategy {
   id: string
   uid: string
+  accountId: string
   name: string
   active: boolean
   direction: Direction
@@ -48,4 +49,4 @@ export interface Strategy {
   updatedAt: Timestamp
 }
 
-export type StrategyInput = Omit<Strategy, 'id' | 'uid' | 'createdAt' | 'updatedAt'>
+export type StrategyInput = Omit<Strategy, 'id' | 'uid' | 'accountId' | 'createdAt' | 'updatedAt'>

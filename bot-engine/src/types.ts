@@ -66,6 +66,7 @@ export interface TradeResult {
 export interface StrategyConfig {
   id: string
   uid: string
+  accountId?: string
   name: string
   active: boolean
   direction: 'long' | 'short' | 'both'
@@ -127,6 +128,7 @@ export interface Signal {
 export interface Trade {
   id: string
   uid: string
+  accountId: string
   strategyId: string
   ticket: number
   pair: string
@@ -150,6 +152,7 @@ export interface PaperPosition {
   ticket: number
   tradeId: string
   uid: string
+  accountId: string
   strategyId: string
   symbol: string
   type: 'buy' | 'sell'

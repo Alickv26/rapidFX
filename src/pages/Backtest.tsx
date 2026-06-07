@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 import { subscribeStrategies, getHistoricalCandles } from '../lib/firestore'
 import { runBacktest } from '../backtest/engine'
 import type { BacktestResult } from '../backtest/engine'
@@ -22,6 +23,7 @@ const DEFAULT_PAIRS = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD
 
 export function BacktestPage() {
   const { user } = useAuth()
+  const { activeAccount, accounts } = useAccount()
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [selectedStrategyId, setSelectedStrategyId] = useState('')
   const [selectedPair, setSelectedPair] = useState('')
@@ -31,6 +33,7 @@ export function BacktestPage() {
     return d.toISOString().split('T')[0]
   })
   const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [balanceSource, setBalanceSource] = useState<'custom' | string>('custom')
   const [initialBalance, setInitialBalance] = useState(100000)
   const [spread, setSpread] = useState(1)
   const [running, setRunning] = useState(false)
@@ -39,8 +42,15 @@ export function BacktestPage() {
 
   useEffect(() => {
     if (!user) return
-    return subscribeStrategies(user.uid, setStrategies)
-  }, [user])
+    return subscribeStrategies(user.uid, setStrategies, activeAccount?.id)
+  }, [user, activeAccount?.id])
+
+  useEffect(() => {
+    if (balanceSource !== 'custom') {
+      const acc = accounts.find((a) => a.id === balanceSource)
+      if (acc) setInitialBalance(acc.balance)
+    }
+  }, [balanceSource, accounts])
 
   const selectedStrategy = useMemo(
     () => strategies.find((s) => s.id === selectedStrategyId) ?? null,
@@ -164,6 +174,19 @@ export function BacktestPage() {
               value={toDate}
               onChange={(e) => { setToDate(e.target.value); setResult(null) }}
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-surface-400 mb-1">Balance Source</label>
+            <select
+              className="input text-sm"
+              value={balanceSource}
+              onChange={(e) => { setBalanceSource(e.target.value); setResult(null) }}
+            >
+              <option value="custom">Custom amount</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.label} (${a.balance.toFixed(0)})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-surface-400 mb-1">Initial Balance ($)</label>

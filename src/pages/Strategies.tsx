@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Play, Pause, Edit2, Trash2, BarChart3 } from 'lucide-react'
+import { Plus, Play, Pause, Edit2, Trash2, BarChart3, Wallet } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useAccount } from '../contexts/AccountContext'
 import { getStrategies, updateStrategy, deleteStrategy } from '../lib/firestore'
 import type { Strategy } from '../types/strategy'
 
+const typeColor = (t: string) => {
+  switch (t) {
+    case 'paper': return 'text-amber-400'
+    case 'demo': return 'text-blue-400'
+    case 'live': return 'text-green-400'
+    default: return 'text-surface-400'
+  }
+}
+
 export function StrategiesPage() {
   const { user } = useAuth()
+  const { activeAccount, accounts } = useAccount()
   const navigate = useNavigate()
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,7 +27,7 @@ export function StrategiesPage() {
     if (!user) return
     try {
       setLoading(true)
-      const data = await getStrategies(user.uid)
+      const data = await getStrategies(user.uid, activeAccount?.id)
       setStrategies(data)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load strategies')
@@ -25,7 +36,7 @@ export function StrategiesPage() {
     }
   }
 
-  useEffect(() => { load() }, [user])
+  useEffect(() => { load() }, [user, activeAccount?.id])
 
   const toggleActive = async (s: Strategy) => {
     try {
@@ -74,7 +85,9 @@ export function StrategiesPage() {
         <div className="card text-center py-12">
           <BarChart3 size={48} className="mx-auto text-surface-300 mb-4" />
           <h3 className="font-semibold text-surface-500 mb-1">No strategies yet</h3>
-          <p className="text-sm text-surface-400 mb-4">Create your first trading strategy</p>
+          <p className="text-sm text-surface-400 mb-4">
+            {activeAccount ? `Create your first strategy for ${activeAccount.label}` : 'Create your first trading strategy'}
+          </p>
           <Link to="/strategies/new" className="btn-primary inline-flex items-center gap-2">
             <Plus size={18} />
             Create Strategy
@@ -82,34 +95,45 @@ export function StrategiesPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {strategies.map((s) => (
-            <div key={s.id} className="card flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className={`w-2 h-2 rounded-full ${s.active ? 'bg-green-400' : 'bg-surface-400'}`} />
-                <div>
-                  <h3 className="font-medium">{s.name}</h3>
-                  <p className="text-sm text-surface-400">
-                    {s.pairs.join(', ')} · {s.timeframes.join('/')} · {s.direction}
-                  </p>
-                  <p className="text-xs text-surface-400 mt-0.5">
-                    SL: {s.risk.slType} ({s.risk.slValue}) · TP: {s.risk.tpType} ({s.risk.tpValue}) · Max {s.maxOpenTrades} trades · {s.positionSizing.riskPerTrade}% risk
-                  </p>
+          {strategies.map((s) => {
+            const boundAccount = accounts.find((a) => a.id === s.accountId)
+            return (
+              <div key={s.id} className="card flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-2 h-2 rounded-full ${s.active ? 'bg-green-400' : 'bg-surface-400'}`} />
+                  <div>
+                    <h3 className="font-medium flex items-center gap-2">
+                      {s.name}
+                      {boundAccount && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColor(boundAccount.type)} bg-surface-800`}>
+                          <Wallet size={10} className="inline mr-0.5" />
+                          {boundAccount.label}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-sm text-surface-400">
+                      {s.pairs.join(', ')} · {s.timeframes.join('/')} · {s.direction}
+                    </p>
+                    <p className="text-xs text-surface-400 mt-0.5">
+                      SL: {s.risk.slType} ({s.risk.slValue}) · TP: {s.risk.tpType} ({s.risk.tpValue}) · Max {s.maxOpenTrades} trades · {s.positionSizing.riskPerTrade}% risk
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-surface-400 mr-2">{winRate(s)} win rate</span>
+                  <button onClick={() => toggleActive(s)} className="btn-ghost p-2" title={s.active ? 'Pause' : 'Activate'}>
+                    {s.active ? <Pause size={16} /> : <Play size={16} />}
+                  </button>
+                  <button onClick={() => navigate(`/strategies/${s.id}/edit`)} className="btn-ghost p-2" title="Edit">
+                    <Edit2 size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(s)} className="btn-ghost p-2 text-red-400 hover:text-red-300" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-surface-400 mr-2">{winRate(s)} win rate</span>
-                <button onClick={() => toggleActive(s)} className="btn-ghost p-2" title={s.active ? 'Pause' : 'Activate'}>
-                  {s.active ? <Pause size={16} /> : <Play size={16} />}
-                </button>
-                <button onClick={() => navigate(`/strategies/${s.id}/edit`)} className="btn-ghost p-2" title="Edit">
-                  <Edit2 size={16} />
-                </button>
-                <button onClick={() => handleDelete(s)} className="btn-ghost p-2 text-red-400 hover:text-red-300" title="Delete">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

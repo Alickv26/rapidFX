@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { PaperModeProvider } from "./contexts/PaperModeContext";
+import { AccountProvider } from "./contexts/AccountContext";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/Login";
 import { RegisterPage } from "./pages/Register";
@@ -14,6 +14,7 @@ import { AnalyticsPage } from "./pages/Analytics";
 import { BacktestPage } from "./pages/Backtest";
 import { AuditLogPage } from "./pages/AuditLog";
 import { NewsCalendarPage } from "./pages/NewsCalendar";
+import { AccountsPage } from "./pages/Accounts";
 
 const queryClient = new QueryClient();
 
@@ -132,6 +133,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/accounts"
+        element={
+          <ProtectedRoute>
+            <AccountsPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -142,9 +151,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <PaperModeProvider>
+          <AccountProvider>
             <AppRoutes />
-          </PaperModeProvider>
+          </AccountProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

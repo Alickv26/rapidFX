@@ -44,6 +44,7 @@ export async function loadPaperPositions(): Promise<void> {
       ticket: t.ticket,
       tradeId: t.id,
       uid: t.uid,
+      accountId: t.accountId,
       strategyId: t.strategyId,
       symbol: t.pair,
       type: t.direction,
@@ -76,6 +77,7 @@ export async function executePaperTrade(
 
   const tradeData: Omit<Trade, 'id'> = {
     uid: strategy.uid,
+    accountId: strategy.accountId ?? '',
     strategyId: strategy.id,
     ticket,
     pair: pairDisplay,
@@ -100,6 +102,7 @@ export async function executePaperTrade(
     ticket,
     tradeId,
     uid: strategy.uid,
+    accountId: strategy.accountId ?? '',
     strategyId: strategy.id,
     symbol: pairDisplay,
     type: direction,

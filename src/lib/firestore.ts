@@ -14,8 +14,10 @@ import {
   onSnapshot,
   Timestamp,
   type Unsubscribe,
+  type QueryConstraint,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import type { Account, AccountInput } from '../types/account'
 import type { Strategy, StrategyInput } from '../types/strategy'
 import type { Trade, Signal, Candle, AccountSnapshot } from '../types/trade'
 import type { NewsEvent } from '../types/news'
@@ -26,10 +28,54 @@ const SIGNALS = 'signals'
 const NEWS = 'newsEvents'
 const CANDLES = 'candles'
 
+// ── Accounts ──
+
+export function subscribeAccounts(uid: string, cb: (accounts: Account[]) => void): Unsubscribe {
+  const q = query(collection(db, 'users', uid, 'accounts'), orderBy('createdAt', 'asc'))
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Account)))
+  })
+}
+
+export async function createAccount(uid: string, data: AccountInput): Promise<string> {
+  const now = Timestamp.now()
+  const ref = await addDoc(collection(db, 'users', uid, 'accounts'), { ...data, createdAt: now, updatedAt: now })
+  return ref.id
+}
+
+export async function updateAccount(uid: string, accountId: string, data: Partial<AccountInput>): Promise<void> {
+  await updateDoc(doc(db, 'users', uid, 'accounts', accountId), { ...data, updatedAt: Timestamp.now() })
+}
+
+export async function deleteAccount(uid: string, accountId: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', uid, 'accounts', accountId))
+}
+
+export async function migrateUserToMultiAccount(uid: string): Promise<string | null> {
+  const snap = await getDoc(doc(db, 'users', uid, 'settings', 'default'))
+  if (!snap.exists()) return null
+  const existing = await getDocs(collection(db, 'users', uid, 'accounts'))
+  if (!existing.empty) return existing.docs[0].id
+
+  const data = snap.data()
+  const apiKey = `key_${uid.slice(0, 8)}_${Date.now().toString(36)}`
+  const id = await createAccount(uid, {
+    label: 'Default Account',
+    type: data.paperMode ? 'paper' : 'live',
+    balance: data.paperBalance ?? 100000,
+    equity: data.paperBalance ?? 100000,
+    apiKey,
+    active: true,
+  })
+  return id
+}
+
 // ── Strategies ──
 
-export async function getStrategies(uid: string): Promise<Strategy[]> {
-  const q = query(collection(db, STRATEGIES), where('uid', '==', uid))
+export async function getStrategies(uid: string, accountId?: string): Promise<Strategy[]> {
+  const constraints = [where('uid', '==', uid)]
+  if (accountId) constraints.push(where('accountId', '==', accountId))
+  const q = query(collection(db, STRATEGIES), ...constraints)
   const snap = await getDocs(q)
   return snap.docs
     .map((d) => ({ id: d.id, ...d.data() } as Strategy))
@@ -42,11 +88,12 @@ export async function getStrategy(id: string): Promise<Strategy | null> {
   return { id: snap.id, ...snap.data() } as Strategy
 }
 
-export async function createStrategy(uid: string, data: StrategyInput): Promise<string> {
+export async function createStrategy(uid: string, accountId: string, data: StrategyInput): Promise<string> {
   const now = Timestamp.now()
   const ref = await addDoc(collection(db, STRATEGIES), {
     ...data,
     uid,
+    accountId,
     createdAt: now,
     updatedAt: now,
   })
@@ -66,36 +113,30 @@ export async function deleteStrategy(id: string): Promise<void> {
 
 // ── Trades ──
 
-export function subscribeTrades(uid: string, cb: (trades: Trade[]) => void): Unsubscribe {
-  const q = query(
-    collection(db, TRADES),
-    where('uid', '==', uid),
-    orderBy('openTime', 'desc'),
-    limit(50)
-  )
+function addAccountFilter(constraints: any[], accountId?: string) {
+  if (accountId) constraints.push(where('accountId', '==', accountId))
+  return constraints
+}
+
+export function subscribeTrades(uid: string, cb: (trades: Trade[]) => void, accountId?: string): Unsubscribe {
+  const constraints = addAccountFilter([where('uid', '==', uid), orderBy('openTime', 'desc'), limit(50)], accountId)
+  const q = query(collection(db, TRADES), ...constraints)
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trade)))
   })
 }
 
-export function subscribeAllTrades(uid: string, cb: (trades: Trade[]) => void): Unsubscribe {
-  const q = query(
-    collection(db, TRADES),
-    where('uid', '==', uid),
-    orderBy('openTime', 'desc')
-  )
+export function subscribeAllTrades(uid: string, cb: (trades: Trade[]) => void, accountId?: string): Unsubscribe {
+  const constraints = addAccountFilter([where('uid', '==', uid), orderBy('openTime', 'desc')], accountId)
+  const q = query(collection(db, TRADES), ...constraints)
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trade)))
   })
 }
 
-export function subscribeOpenTrades(uid: string, cb: (trades: Trade[]) => void): Unsubscribe {
-  const q = query(
-    collection(db, TRADES),
-    where('uid', '==', uid),
-    where('status', '==', 'open'),
-    orderBy('openTime', 'desc')
-  )
+export function subscribeOpenTrades(uid: string, cb: (trades: Trade[]) => void, accountId?: string): Unsubscribe {
+  const constraints = addAccountFilter([where('uid', '==', uid), where('status', '==', 'open'), orderBy('openTime', 'desc')], accountId)
+  const q = query(collection(db, TRADES), ...constraints)
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trade)))
   })
@@ -158,8 +199,10 @@ export async function getHistoricalCandles(symbol: string): Promise<Candle[]> {
 
 // ── Strategies (realtime) ──
 
-export function subscribeStrategies(uid: string, cb: (strategies: Strategy[]) => void): Unsubscribe {
-  const q = query(collection(db, STRATEGIES), where('uid', '==', uid))
+export function subscribeStrategies(uid: string, cb: (strategies: Strategy[]) => void, accountId?: string): Unsubscribe {
+  const constraints = [where('uid', '==', uid)]
+  if (accountId) constraints.push(where('accountId', '==', accountId))
+  const q = query(collection(db, STRATEGIES), ...constraints)
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Strategy)))
   })
@@ -167,11 +210,12 @@ export function subscribeStrategies(uid: string, cb: (strategies: Strategy[]) =>
 
 // ── Account Snapshots ──
 
-export function subscribeAccountSnapshots(uid: string, cb: (snapshots: AccountSnapshot[]) => void): Unsubscribe {
+export function subscribeAccountSnapshots(uid: string, cb: (snapshots: AccountSnapshot[]) => void, accountId?: string): Unsubscribe {
+  const constraints: QueryConstraint[] = [orderBy('timestamp', 'asc'), limit(500)]
+  if (accountId) constraints.unshift(where('accountId', '==', accountId))
   const q = query(
     collection(db, 'users', uid, 'accountSnapshots'),
-    orderBy('timestamp', 'asc'),
-    limit(500)
+    ...constraints,
   )
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AccountSnapshot)))

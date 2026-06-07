@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { usePaperMode } from '../contexts/PaperModeContext'
+import { useAccount } from '../contexts/AccountContext'
 import { DollarSign, TrendingUp, BarChart3, Activity, Zap, CandlestickChart } from 'lucide-react'
 import {
   subscribeOpenTrades,
   subscribeSignals,
   subscribeAccountSnapshots,
   subscribeCandles,
-  subscribePaperSettings,
 } from '../lib/firestore'
 import type { Trade, Signal, AccountSnapshot, Candle } from '../types/trade'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -137,21 +136,19 @@ function PriceChart({ symbol }: { symbol: string }) {
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const { paperMode } = usePaperMode()
+  const { activeAccount } = useAccount()
   const [trades, setTrades] = useState<Trade[]>([])
   const [signals, setSignals] = useState<Signal[]>([])
   const [snapshots, setSnapshots] = useState<AccountSnapshot[]>([])
   const [chartSymbol, setChartSymbol] = useState<string>(PAIRS[0])
-  const [paperSettings, setPaperSettings] = useState<{ paperMode: boolean; paperBalance: number } | null>(null)
 
   useEffect(() => {
     if (!user) return
-    const unsubTrades = subscribeOpenTrades(user.uid, setTrades)
+    const unsubTrades = subscribeOpenTrades(user.uid, setTrades, activeAccount?.id)
     const unsubSignals = subscribeSignals(user.uid, setSignals, 5)
-    const unsubSnapshots = subscribeAccountSnapshots(user.uid, setSnapshots)
-    const unsubPaper = subscribePaperSettings(user.uid, setPaperSettings)
-    return () => { unsubTrades(); unsubSignals(); unsubSnapshots(); unsubPaper() }
-  }, [user])
+    const unsubSnapshots = subscribeAccountSnapshots(user.uid, setSnapshots, activeAccount?.id)
+    return () => { unsubTrades(); unsubSignals(); unsubSnapshots() }
+  }, [user, activeAccount?.id])
 
   const openTrades = trades.filter((t) => t.status === 'open')
   const closedTrades = trades.filter((t) => t.status === 'closed')
@@ -159,14 +156,11 @@ export function DashboardPage() {
   const totalPnl = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0)
   const winRate = closedTrades.length > 0 ? ((wins / closedTrades.length) * 100).toFixed(0) : '—'
 
-  const openPnl = openTrades.reduce((s, t) => s + (t.pnl ?? 0), 0)
   const lastSnapshot = snapshots[snapshots.length - 1]
 
-  const displayBalance = paperMode && paperSettings
-    ? paperSettings.paperBalance
-    : lastSnapshot?.balance ?? 0
-  const displayEquity = paperMode && paperSettings
-    ? paperSettings.paperBalance + openPnl
+  const displayBalance = activeAccount?.balance ?? lastSnapshot?.balance ?? 0
+  const displayEquity = activeAccount
+    ? activeAccount.equity
     : lastSnapshot?.equity ?? 0
 
   const balance = `$${displayBalance.toFixed(2)}`
@@ -189,14 +183,22 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-surface-400 text-sm mt-1">
+            {activeAccount ? `${activeAccount.label} · ` : ''}
             Welcome back, {user?.email?.split('@')[0]}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${paperMode ? 'bg-amber-900/30 text-amber-400' : 'bg-surface-800 text-surface-400'}`}>
-            <Zap className="w-3 h-3" />
-            {paperMode ? 'Paper Trading' : 'Live Mode'}
-          </span>
+          {activeAccount && (
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+              activeAccount.type === 'paper' ? 'bg-amber-900/30 text-amber-400' :
+              activeAccount.type === 'demo' ? 'bg-blue-900/30 text-blue-400' :
+              'bg-green-900/30 text-green-400'
+            }`}>
+              <Zap className="w-3 h-3" />
+              {activeAccount.type === 'paper' ? 'Paper Trading' :
+               activeAccount.type === 'demo' ? 'Demo Account' : 'Live Account'}
+            </span>
+          )}
         </div>
       </div>
 
