@@ -23,6 +23,8 @@ import {
   LineChart,
   Line,
 } from 'recharts'
+import { ResponsiveTable, type Column } from '../components/ResponsiveTable'
+import { SkeletonStatCard, SkeletonChart, SkeletonTable } from '../components/Skeleton'
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -193,12 +195,15 @@ export function AnalyticsPage() {
   const { activeAccount } = useAccount()
   const [trades, setTrades] = useState<Trade[]>([])
   const [strategies, setStrategies] = useState<Strategy[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     if (!user) return
-    const unsubTrades = subscribeAllTrades(user.uid, setTrades, activeAccount?.id)
+    setLoaded(false)
+    const timer = setTimeout(() => setLoaded(true), 3000)
+    const unsubTrades = subscribeAllTrades(user.uid, (d: Trade[]) => { setTrades(d); clearTimeout(timer); setLoaded(true) }, activeAccount?.id)
     const unsubStrategies = subscribeStrategies(user.uid, setStrategies, activeAccount?.id)
-    return () => { unsubTrades(); unsubStrategies() }
+    return () => { clearTimeout(timer); unsubTrades(); unsubStrategies() }
   }, [user, activeAccount?.id])
 
   const strategyMap = useMemo(
@@ -223,6 +228,21 @@ export function AnalyticsPage() {
     [closedTrades],
   )
 
+  if (!loaded) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Analytics</h1>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <SkeletonChart />
+          <SkeletonChart />
+        </div>
+        <SkeletonTable rows={4} />
+      </div>
+    )
+  }
   if (!stats || closedTrades.length === 0) {
     return (
       <div className="space-y-6">
@@ -234,6 +254,22 @@ export function AnalyticsPage() {
       </div>
     )
   }
+
+  const topTradeColumns: Column<Trade>[] = [
+    { header: 'Time', render: (t) => <span className="text-surface-400 font-mono text-xs">{new Date(t.openTime).toLocaleDateString()}</span> },
+    { header: 'Pair', render: (t) => <span className="font-medium">{t.pair}</span> },
+    {
+      header: 'Direction',
+      render: (t) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+          {t.direction === 'buy' ? 'BUY' : 'SELL'}
+        </span>
+      ),
+    },
+    { header: 'Volume', render: (t) => <span className="font-mono">{t.volume.toFixed(2)}</span>, textAlign: 'right' },
+    { header: 'Pips', render: (t) => <span className="font-mono">{t.pips?.toFixed(1) ?? '—'}</span>, textAlign: 'right' },
+    { header: 'P&L', render: (t) => <span className={`font-mono ${(t.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>{t.pnl != null ? `$${t.pnl.toFixed(2)}` : '—'}</span>, textAlign: 'right' },
+  ]
 
   const summaryCards = [
     { label: 'Total P&L', value: formatPnl(stats.totalPnl), icon: DollarSign, color: stats.totalPnl >= 0 ? 'text-green-400' : 'text-red-400' },
@@ -274,10 +310,10 @@ export function AnalyticsPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card p-4">
           <h2 className="text-sm font-semibold text-surface-200 mb-3">P&L by Month</h2>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={180}>
             <BarChart data={monthly}>
               <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#6b7280' }} />
               <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} />
@@ -291,7 +327,7 @@ export function AnalyticsPage() {
         </div>
         <div className="card p-4">
           <h2 className="text-sm font-semibold text-surface-200 mb-3">P&L by Pair</h2>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={180}>
             <BarChart data={byPair} layout="vertical">
               <XAxis type="number" tick={{ fontSize: 10, fill: '#6b7280' }} />
               <YAxis type="category" dataKey="pair" tick={{ fontSize: 10, fill: '#6b7280' }} width={60} />
@@ -305,10 +341,10 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card p-4">
           <h2 className="text-sm font-semibold text-surface-200 mb-3">Long vs Short</h2>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={byDirection}>
               <XAxis dataKey="direction" tick={{ fontSize: 12, fill: '#6b7280' }}
                 tickFormatter={(v) => v === 'buy' ? 'LONG' : 'SHORT'} />
@@ -324,7 +360,7 @@ export function AnalyticsPage() {
         </div>
         <div className="card p-4">
           <h2 className="text-sm font-semibold text-surface-200 mb-3">P&L by Strategy</h2>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={byStrategy}>
               <XAxis dataKey="strategy" tick={{ fontSize: 10, fill: '#6b7280' }} />
               <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} />
@@ -341,7 +377,7 @@ export function AnalyticsPage() {
       <div className="card p-4">
         <h2 className="text-sm font-semibold text-surface-200 mb-3">Cumulative P&L</h2>
         {equityCurve.length > 1 ? (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={equityCurve}>
               <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#6b7280' }} />
               <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#6b7280' }} />
@@ -359,38 +395,11 @@ export function AnalyticsPage() {
 
       <div>
         <h2 className="text-sm font-semibold text-surface-200 mb-3">Top Trades</h2>
-          <div className="card overflow-x-auto">
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
-                <th className="text-left p-3">Time</th>
-                <th className="text-left p-3">Pair</th>
-                <th className="text-left p-3">Direction</th>
-                <th className="text-right p-3">Volume</th>
-                <th className="text-right p-3">Pips</th>
-                <th className="text-right p-3">P&L</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topTrades.map((t) => (
-                <tr key={t.id} className="border-b border-surface-700/50">
-                  <td className="p-3 text-surface-400 font-mono text-xs">{new Date(t.openTime).toLocaleDateString()}</td>
-                  <td className="p-3 font-medium">{t.pair}</td>
-                  <td className="p-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
-                      {t.direction === 'buy' ? 'BUY' : 'SELL'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right font-mono">{t.volume.toFixed(2)}</td>
-                  <td className="p-3 text-right font-mono">{t.pips?.toFixed(1) ?? '—'}</td>
-                  <td className={`p-3 text-right font-mono ${(t.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {t.pnl != null ? `$${t.pnl.toFixed(2)}` : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable<Trade>
+          columns={topTradeColumns}
+          data={topTrades}
+          keyExtractor={(t) => t.id}
+        />
       </div>
     </div>
   )

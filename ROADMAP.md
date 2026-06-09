@@ -5,10 +5,8 @@
 - Firebase Auth (email/password, Google OAuth)
 - Layout with sidebar navigation
 - Strategy management (create, list, edit forms, multi-select pairs/timeframes/patterns)
-- `PaperModeContext` — React-state toggle
 - `Dashboard` — static stats cards, open trades table, signals table
 - `Trades` — basic table
-- `Backtest` — placeholder page
 - `AuditLog` — placeholder page
 
 ## Phase 3 — Bot Engine ✅
@@ -35,19 +33,23 @@
 - `AccountSnapshot` subscription on Dashboard equity curve
 - Firestore rules and indexes
 
-## Phase 5 — Paper Trading ✅
-- **New:** `paper-trader.ts` — in-memory paper position management, SL/TP checks on heartbeat, trailing stop, P&L calculation, balance updates
+## Phase 5 — Paper Trading ⚠️ (engine done, frontend gaps)
+- **Engine:** `paper-trader.ts` — in-memory paper position management, SL/TP checks on heartbeat, trailing stop, P&L calculation, balance updates
 - **Types:** `paper?: boolean` on `Trade`, `PaperPosition` interface
 - **Engine path:** `evaluateAll()` checks user settings per strategy; uses paper balance for risk calcs, paper positions for drawdown/trade-count checks, calls `executePaperTrade()` instead of MT5 commands
 - **Heartbeat:** `processPaperHeartbeat()` checks all paper positions for SL/TP hits; updates unrealized P&L; closes expired positions and updates paper balance
 - **Persistence:** Positions reloaded from Firestore on engine restart via `loadPaperPositions()`
-- **Frontend:** `PaperModeContext` wired to Firestore `users/{uid}/settings/default`; Dashboard shows paper balance/equity from settings + open P&L; Trades page has filter (All/Live/Paper) and PAPER badge; Backtest page enhanced placeholder
+- **Frontend gaps (not yet implemented):**
+  - Dedicated `PaperModeContext` React context does not exist — paper mode lives in AccountContext + raw Firestore, but is never consumed by the UI
+  - Dashboard does not display paper balance/equity separately
+  - Trades page has no All/Live/Paper filter and no PAPER badge
+  - No React toggle component for switching paper/live mode
 
-## Phase 6 (planned) — Advanced Reporting
-- P&L analytics dashboard (daily/weekly/monthly breakdown)
-- Performance metrics (Sharpe ratio, max drawdown, profit factor)
-- Trade export (CSV/PDF)
-- Win rate by pair, timeframe, pattern
+## Phase 6 — Advanced Reporting ✅
+- P&L analytics dashboard (monthly breakdown, by pair, long vs short, by strategy)
+- Performance metrics (Sharpe ratio, max drawdown, profit factor, win rate)
+- Trade export (CSV)
+- Cumulative P&L curve, top trades table
 
 ## Phase 7 (planned) — Notifications
 - Trade open/close alerts (email, in-app toast)
@@ -55,19 +57,60 @@
 - Drawdown threshold warnings
 - Daily/weekly performance summaries
 
-## Phase 8 (planned) — Backtesting Engine
-- Replace placeholder with real backtesting
-- Date range picker, strategy selector, initial balance
-- Historical candle replay engine
-- Performance comparison (paper vs backtest)
+## Phase 8 — Backtesting Engine ✅
+- Date range picker, strategy/pair selector, initial balance, spread config
+- Historical candle simulation with pattern detection, SL/TP, position sizing
+- Summary cards (trades, win rate, Sharpe, drawdown, profit factor)
+- Equity curve chart + trade table
+- CSV export
 
-## Phase 9 (planned) — Multi-Account
-- Link multiple MT5 accounts
+## Phase 9 — Multi-Account ✅
+- Create/manage paper/demo/live accounts with copyable API keys
 - Account switching in sidebar
-- Per-account dashboard, trades, settings
+- Per-account dashboard, strategies, trades, settings
+- Legacy single-account auto-migration
 
-## Phase 10 (planned) — Mobile & PWA
-- Responsive sidebar (collapsible, bottom nav)
-- PWA manifest + service worker
-- Push notifications
-- Touch-friendly trade tables
+## Phase 10 — Mobile & PWA ⚠️ (partially done)
+- Responsive sidebar (collapsible, mobile drawer, bottom nav)
+- PWA manifest + service worker (vite-plugin-pwa)
+- Install banner (`InstallPrompt` component)
+- **Not yet implemented:**
+  - Push notification subscription + service worker push handler
+  - Touch-friendly trade tables
+  - Offline support
+
+---
+
+## Tech Debt & Fixes (not phase-bound)
+
+### 🔴 Security — service-account.json committed
+`bot-engine/service-account.json` contains real Firebase Admin SDK credentials and is committed to git. The `.gitignore` pattern exists but was added after the fact.
+- **Action:** Rotate the service account key, remove from git history, enforce `.gitignore`
+
+### 🟡 Dead code — `@tanstack/react-query`
+`QueryClientProvider` wraps the app but no query or mutation uses it. All data fetching uses raw Firestore `onSnapshot`.
+- **Action:** Remove dependency and provider wrapper
+
+### 🟡 Dead config — Vite API proxy
+`vite.config.ts` proxies `/api` → `localhost:3001` but the frontend talks directly to Firestore, never to the bot engine.
+- **Action:** Remove proxy unless a frontend-to-bot-engine path is planned
+
+### 🟡 Fake win rate in Strategies list
+`Strategies.tsx` computes win rate as `55 + Math.random() * 35` — a random placeholder, not actual trade data.
+- **Action:** Calculate from real trade history or remove the column
+
+### 🟡 Firestore indexes not configured
+`firestore.indexes.json` is empty. All compound queries (`where` + `orderBy` + `limit`) will fail at scale.
+- **Action:** Add composite indexes for all subscribed queries
+
+### 🟡 No tests
+Zero test files across frontend, functions, or bot-engine. No test runner configured.
+- **Action:** Add Vitest for React components, Jest/Vitest for bot-engine logic
+
+### 🟡 No CI/CD
+No GitHub Actions or other pipeline. No automated typecheck/lint/test on push.
+- **Action:** Add CI workflow for typecheck + lint, optionally deploy Cloud Functions
+
+### 🟡 AuditLog page still a placeholder
+`/audit` route shows "coming next phase". No data subscription.
+- **Action:** Either implement with Firestore subscription or remove the route

@@ -85,7 +85,7 @@ export function MultiSelect({ selected, onChange }: MultiSelectProps) {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-surface-100 border border-surface-200 rounded-lg shadow-xl max-h-72 overflow-y-auto">
+        <div className="fixed inset-x-4 top-1/4 z-50 max-h-72 bg-surface-100 border border-surface-200 rounded-lg shadow-xl overflow-y-auto md:absolute md:inset-auto md:mt-1 md:w-full md:mx-0">
           {groups.map((group) => {
             const groupOptions = FOREX_PAIRS.filter((o) => o.group === group)
             const allSelected = groupOptions.every((o) => selected.includes(o.value))

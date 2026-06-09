@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useEffect, useRef } from "react";
 import type { StrategyInput, Timeframe, Direction } from "../types/strategy";
 import { MultiSelect } from "./MultiSelect";
 
@@ -85,7 +85,21 @@ function Toggle({
 }
 
 export function StrategyForm({ initialData, onSave, isSaving }: Props) {
+  const formRef = useRef<HTMLFormElement>(null)
   const [f, setF] = useState<StrategyInput>(initialData ?? defaultForm);
+
+  useEffect(() => {
+    const form = formRef.current
+    if (!form) return
+    const handler = (e: FocusEvent) => {
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
+        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350)
+      }
+    }
+    form.addEventListener('focusin', handler)
+    return () => form.removeEventListener('focusin', handler)
+  }, [])
 
   const update = <K extends keyof StrategyInput>(
     key: K,
@@ -98,7 +112,7 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-6">
+    <form ref={formRef} onSubmit={submit} className="space-y-6">
       <Section title="Basic Info">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -503,8 +517,8 @@ export function StrategyForm({ initialData, onSave, isSaving }: Props) {
         )}
       </Section>
 
-      <div className="flex justify-end gap-3">
-        <button type="submit" disabled={isSaving} className="btn-primary">
+      <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 px-6 py-4 bg-surface-100 border-t border-surface-200 flex items-center justify-end gap-3 md:static md:border-0 md:bg-transparent md:p-0 md:mt-6 z-10">
+        <button type="submit" disabled={isSaving} className="btn-primary flex-1 md:flex-none">
           {isSaving ? "Saving..." : "Save Strategy"}
         </button>
       </div>

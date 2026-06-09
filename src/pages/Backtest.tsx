@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import { subscribeStrategies, getHistoricalCandles } from '../lib/firestore'
 import { runBacktest } from '../backtest/engine'
-import type { BacktestResult } from '../backtest/engine'
+import type { BacktestResult, BacktestTrade } from '../backtest/engine'
 import type { Strategy } from '../types/strategy'
 import { FlaskConical, TrendingUp, Target, ArrowDown, DollarSign, Download } from 'lucide-react'
 import {
@@ -14,6 +14,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { ResponsiveTable, type Column } from '../components/ResponsiveTable'
 
 function formatPnl(v: number): string {
   return v >= 0 ? `+$${v.toFixed(2)}` : `-$${Math.abs(v).toFixed(2)}`
@@ -121,6 +122,37 @@ export function BacktestPage() {
     }))
   }, [result])
 
+  const backtestColumns: Column<BacktestTrade>[] = [
+    { header: '#', render: (_, i) => <span className="text-surface-400 text-xs">{i + 1}</span> },
+    { header: 'Time', render: (t) => <span className="text-surface-400 font-mono text-xs">{new Date(t.openTime).toLocaleDateString()}</span> },
+    {
+      header: 'Direction',
+      render: (t) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+          {t.direction === 'buy' ? 'BUY' : 'SELL'}
+        </span>
+      ),
+    },
+    { header: 'Volume', render: (t) => <span className="font-mono">{t.volume.toFixed(2)}</span>, textAlign: 'right' },
+    { header: 'Entry', render: (t) => <span className="font-mono">{t.openPrice.toFixed(5)}</span>, textAlign: 'right' },
+    { header: 'Exit', render: (t) => <span className="font-mono">{t.closePrice.toFixed(5)}</span>, textAlign: 'right' },
+    { header: 'Pips', render: (t) => <span className="font-mono">{t.pips.toFixed(1)}</span>, textAlign: 'right' },
+    { header: 'P&L', render: (t) => <span className={`font-mono ${t.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatPnl(t.pnl)}</span>, textAlign: 'right' },
+    {
+      header: 'Close',
+      render: (t) => (
+        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+          t.closeReason === 'tp' ? 'bg-green-900/30 text-green-400' :
+          t.closeReason === 'sl' ? 'bg-red-900/30 text-red-400' :
+          'bg-surface-700 text-surface-400'
+        }`}>
+          {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : 'END'}
+        </span>
+      ),
+      textAlign: 'center',
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -138,6 +170,7 @@ export function BacktestPage() {
               className="input text-sm"
               value={selectedStrategyId}
               onChange={(e) => { setSelectedStrategyId(e.target.value); setResult(null) }}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             >
               <option value="">Select a strategy...</option>
               {strategies.map((s) => (
@@ -151,6 +184,7 @@ export function BacktestPage() {
               className="input text-sm"
               value={selectedPair}
               onChange={(e) => { setSelectedPair(e.target.value); setResult(null) }}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             >
               {availablePairs.map((p) => (
                 <option key={p} value={p}>{p}</option>
@@ -164,6 +198,7 @@ export function BacktestPage() {
               className="input text-sm"
               value={fromDate}
               onChange={(e) => { setFromDate(e.target.value); setResult(null) }}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             />
           </div>
           <div>
@@ -173,6 +208,7 @@ export function BacktestPage() {
               className="input text-sm"
               value={toDate}
               onChange={(e) => { setToDate(e.target.value); setResult(null) }}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             />
           </div>
           <div>
@@ -181,6 +217,7 @@ export function BacktestPage() {
               className="input text-sm"
               value={balanceSource}
               onChange={(e) => { setBalanceSource(e.target.value); setResult(null) }}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             >
               <option value="custom">Custom amount</option>
               {accounts.map((a) => (
@@ -197,6 +234,7 @@ export function BacktestPage() {
               onChange={(e) => { setInitialBalance(Number(e.target.value)); setResult(null) }}
               min={100}
               step={1000}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             />
           </div>
           <div>
@@ -209,6 +247,7 @@ export function BacktestPage() {
               min={0}
               max={100}
               step={0.1}
+              onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
             />
           </div>
           <div className="flex items-end">
@@ -259,7 +298,7 @@ export function BacktestPage() {
           <div className="card p-4">
             <h2 className="text-sm font-semibold text-surface-200 mb-3">Equity Curve</h2>
             {equityData.length > 1 ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={equityData}>
                   <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#6b7280' }} />
                   <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#6b7280' }} />
@@ -298,52 +337,38 @@ export function BacktestPage() {
                 CSV
               </button>
             </div>
-            <div className="card overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
-                    <th className="text-left p-3">#</th>
-                    <th className="text-left p-3">Time</th>
-                    <th className="text-left p-3">Direction</th>
-                    <th className="text-right p-3">Volume</th>
-                    <th className="text-right p-3">Entry</th>
-                    <th className="text-right p-3">Exit</th>
-                    <th className="text-right p-3">Pips</th>
-                    <th className="text-right p-3">P&L</th>
-                    <th className="text-center p-3">Close</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.trades.map((t, i) => (
-                    <tr key={i} className="border-b border-surface-700/50">
-                      <td className="p-3 text-surface-400 text-xs">{i + 1}</td>
-                      <td className="p-3 text-surface-400 font-mono text-xs">{new Date(t.openTime).toLocaleDateString()}</td>
-                      <td className="p-3">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
-                          {t.direction === 'buy' ? 'BUY' : 'SELL'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right font-mono">{t.volume.toFixed(2)}</td>
-                      <td className="p-3 text-right font-mono">{t.openPrice.toFixed(5)}</td>
-                      <td className="p-3 text-right font-mono">{t.closePrice.toFixed(5)}</td>
-                      <td className="p-3 text-right font-mono">{t.pips.toFixed(1)}</td>
-                      <td className={`p-3 text-right font-mono ${t.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {formatPnl(t.pnl)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                          t.closeReason === 'tp' ? 'bg-green-900/30 text-green-400' :
-                          t.closeReason === 'sl' ? 'bg-red-900/30 text-red-400' :
-                          'bg-surface-700 text-surface-400'
-                        }`}>
-                          {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : 'END'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTable<BacktestTrade>
+              columns={backtestColumns}
+              data={result.trades}
+              keyExtractor={(_, i) => String(i)}
+              mobileCard={(t) => (
+                <div className="card !p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-surface-200">{t.pair}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        t.closeReason === 'tp' ? 'bg-green-900/30 text-green-400' :
+                        t.closeReason === 'sl' ? 'bg-red-900/30 text-red-400' :
+                        'bg-surface-700 text-surface-400'
+                      }`}>
+                        {t.closeReason === 'tp' ? 'TP' : t.closeReason === 'sl' ? 'SL' : 'END'}
+                      </span>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                      {t.direction === 'buy' ? 'BUY' : 'SELL'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="text-xs text-surface-400">Entry</span><p className="font-mono">{t.openPrice.toFixed(5)}</p></div>
+                    <div><span className="text-xs text-surface-400">Exit</span><p className="font-mono">{t.closePrice.toFixed(5)}</p></div>
+                    <div><span className="text-xs text-surface-400">Vol</span><p className="font-mono">{t.volume.toFixed(2)}</p></div>
+                    <div><span className="text-xs text-surface-400">Pips</span><p className="font-mono">{t.pips.toFixed(1)}</p></div>
+                    <div><span className="text-xs text-surface-400">Date</span><p className="font-mono text-xs text-surface-400">{new Date(t.openTime).toLocaleDateString()}</p></div>
+                    <div><span className="text-xs text-surface-400">P&L</span><p className={`font-mono ${t.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatPnl(t.pnl)}</p></div>
+                  </div>
+                </div>
+              )}
+            />
           </div>
         </>
       )}

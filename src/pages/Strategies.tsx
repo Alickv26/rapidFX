@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAccount } from '../contexts/AccountContext'
 import { getStrategies, updateStrategy, deleteStrategy } from '../lib/firestore'
 import type { Strategy } from '../types/strategy'
+import { SkeletonCardRow } from '../components/Skeleton'
 
 const typeColor = (t: string) => {
   switch (t) {
@@ -62,7 +63,7 @@ export function StrategiesPage() {
     return `${Math.floor(55 + Math.random() * 35)}%`
   }
 
-  if (loading) return <div className="text-surface-400">Loading...</div>
+  if (loading) return <SkeletonCardRow count={3} />
 
   return (
     <div className="space-y-6">
@@ -98,11 +99,11 @@ export function StrategiesPage() {
           {strategies.map((s) => {
             const boundAccount = accounts.find((a) => a.id === s.accountId)
             return (
-              <div key={s.id} className="card flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-2 h-2 rounded-full ${s.active ? 'bg-green-400' : 'bg-surface-400'}`} />
-                  <div>
-                    <h3 className="font-medium flex items-center gap-2">
+              <div key={s.id} className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${s.active ? 'bg-green-400' : 'bg-surface-400'}`} />
+                  <div className="min-w-0">
+                    <h3 className="font-medium flex items-center gap-2 flex-wrap">
                       {s.name}
                       {boundAccount && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColor(boundAccount.type)} bg-surface-800`}>
@@ -111,23 +112,23 @@ export function StrategiesPage() {
                         </span>
                       )}
                     </h3>
-                    <p className="text-sm text-surface-400">
+                    <p className="text-sm text-surface-400 truncate">
                       {s.pairs.join(', ')} · {s.timeframes.join('/')} · {s.direction}
                     </p>
-                    <p className="text-xs text-surface-400 mt-0.5">
+                    <p className="text-xs text-surface-400 mt-0.5 hidden sm:block">
                       SL: {s.risk.slType} ({s.risk.slValue}) · TP: {s.risk.tpType} ({s.risk.tpValue}) · Max {s.maxOpenTrades} trades · {s.positionSizing.riskPerTrade}% risk
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-surface-400 mr-2">{winRate(s)} win rate</span>
-                  <button onClick={() => toggleActive(s)} className="btn-ghost p-2" title={s.active ? 'Pause' : 'Activate'}>
+                <div className="flex items-center gap-1 self-end md:self-auto">
+                  <span className="text-sm text-surface-400 mr-1 hidden sm:inline">{winRate(s)} win rate</span>
+                  <button onClick={() => toggleActive(s)} className="btn-ghost p-1.5 md:p-2" title={s.active ? 'Pause' : 'Activate'}>
                     {s.active ? <Pause size={16} /> : <Play size={16} />}
                   </button>
-                  <button onClick={() => navigate(`/strategies/${s.id}/edit`)} className="btn-ghost p-2" title="Edit">
+                  <button onClick={() => navigate(`/strategies/${s.id}/edit`)} className="btn-ghost p-1.5 md:p-2" title="Edit">
                     <Edit2 size={16} />
                   </button>
-                  <button onClick={() => handleDelete(s)} className="btn-ghost p-2 text-red-400 hover:text-red-300" title="Delete">
+                  <button onClick={() => handleDelete(s)} className="btn-ghost p-1.5 md:p-2 text-red-400 hover:text-red-300" title="Delete">
                     <Trash2 size={16} />
                   </button>
                 </div>

@@ -5,6 +5,7 @@ import { useAccount } from '../contexts/AccountContext'
 import { StrategyForm } from '../components/StrategyForm'
 import { Wallet } from 'lucide-react'
 import type { StrategyInput } from '../types/strategy'
+import { SkeletonBlock } from '../components/Skeleton'
 
 export function StrategyEditPage() {
   const { id } = useParams<{ id: string }>()
@@ -44,7 +45,17 @@ export function StrategyEditPage() {
     }
   }
 
-  if (loading) return <div className="text-surface-400">Loading...</div>
+  if (loading) return (
+    <div className="space-y-6">
+      <SkeletonBlock className="h-6 w-40" />
+      <SkeletonBlock className="h-4 w-60" />
+      <div className="space-y-4">
+        <SkeletonBlock className="h-24" />
+        <SkeletonBlock className="h-24" />
+        <SkeletonBlock className="h-24" />
+      </div>
+    </div>
+  )
   if (!initial) return null
 
   return (

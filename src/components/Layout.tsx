@@ -173,7 +173,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* ─── Mobile Layout ─── */}
       <div className="md:hidden flex flex-col flex-1 min-h-0">
         {/* Mobile Top Bar */}
-        <header className="h-14 shrink-0 bg-surface-100 border-b border-surface-200 flex items-center justify-between px-4">
+        <header className="h-14 shrink-0 bg-surface-100 border-b border-surface-200 flex items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
           <button onClick={() => setDrawerOpen(true)} className="p-2 -ml-2 text-surface-400 hover:text-surface-200">
             <Menu size={20} />
           </button>
@@ -185,25 +185,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )}
         </header>
 
-        {/* Mobile Slide-out Drawer */}
+        {/* Mobile Slide-up Drawer (Bottom Sheet) */}
         {drawerOpen && (
-          <div className="fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 z-50 flex items-end">
             <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
-            <aside className="relative w-64 bg-surface-100 flex flex-col overflow-y-auto">
-              <div className="p-4 border-b border-surface-200 flex items-center justify-between">
+            <aside className="relative w-full max-h-[70vh] bg-surface-100 rounded-t-2xl flex flex-col overflow-y-auto animate-slide-up">
+              <div className="flex justify-center pt-3 pb-1 shrink-0">
+                <div className="w-10 h-1 rounded-full bg-surface-400/50" />
+              </div>
+
+              <div className="px-4 pb-2 flex items-center justify-between">
                 <h1 className="text-lg font-bold text-brand-400">RapidFX</h1>
                 <button onClick={() => setDrawerOpen(false)} className="p-1 text-surface-400 hover:text-surface-200">
                   <X size={20} />
                 </button>
               </div>
 
-              <nav className="flex-1 p-4 space-y-1">
+              <nav className="px-4 space-y-1">
                 {navItems.map((item) => (
                   <NavLinkItem key={item.to} {...item} onClick={() => setDrawerOpen(false)} />
                 ))}
               </nav>
 
-              <div className="p-4 border-t border-surface-200 space-y-3">
+              <div className="p-4 mt-2 border-t border-surface-200 space-y-3">
                 {activeAccount && (
                   <div className="space-y-1">
                     <button
@@ -253,6 +257,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   Sign Out
                 </button>
               </div>
+
+              <div className="h-4 shrink-0" />
             </aside>
           </div>
         )}
@@ -263,7 +269,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="h-16 shrink-0 bg-surface-100 border-t border-surface-200 flex items-center justify-around px-2">
+        <nav className="h-16 shrink-0 bg-surface-100 border-t border-surface-200 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
           {primaryNav.map((item) => (
             <NavLink
               key={item.to}

@@ -12,6 +12,8 @@ import type { Trade, Signal, AccountSnapshot, Candle } from '../types/trade'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts'
 import type { IChartApi, ISeriesApi } from 'lightweight-charts'
+import { ResponsiveTable, type Column } from '../components/ResponsiveTable'
+import { SkeletonStatCard, SkeletonChart } from '../components/Skeleton'
 
 const PAIRS = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY']
 
@@ -38,7 +40,7 @@ function AccountEquityCurve({ snapshots }: { snapshots: AccountSnapshot[] }) {
   return (
     <div className="card p-4">
       <h2 className="text-sm font-semibold mb-3 text-surface-200">Account Equity Curve</h2>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={180}>
         <LineChart data={data}>
           <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
           <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -62,14 +64,29 @@ function PriceChart({ symbol }: { symbol: string }) {
 
   useEffect(() => {
     if (!symbol) return
-    const unsub = subscribeCandles(symbol, setCandles)
-    return unsub
+    setCandles([])
+    if (chartRef.current) {
+      chartRef.current.remove()
+      chartRef.current = null
+      seriesRef.current = null
+    }
+    const unsub = subscribeCandles(symbol, (data) => {
+      setCandles(data)
+    })
+    return () => { unsub() }
   }, [symbol])
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current || candles.length > 0) return
+    containerRef.current.style.height = `${Math.min(280, window.innerWidth < 768 ? 200 : 280)}px`
+  }, [candles])
 
-    const chart = createChart(containerRef.current, {
+  useEffect(() => {
+    if (!containerRef.current) return
+    const el = containerRef.current
+    el.style.height = ''
+
+    const chart = createChart(el, {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: '#6b7280',
@@ -79,8 +96,8 @@ function PriceChart({ symbol }: { symbol: string }) {
         vertLines: { color: '#1e293b' },
         horzLines: { color: '#1e293b' },
       },
-      width: containerRef.current.clientWidth,
-      height: 280,
+      width: el.clientWidth,
+      height: Math.min(280, window.innerWidth < 768 ? 200 : 280),
       crosshair: {
         vertLine: { color: '#334155', width: 1, style: 2 },
         horzLine: { color: '#334155', width: 1, style: 2 },
@@ -99,15 +116,16 @@ function PriceChart({ symbol }: { symbol: string }) {
     chartRef.current = chart
     seriesRef.current = series
 
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth })
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect
+        chart.applyOptions({ width })
       }
-    }
-    window.addEventListener('resize', handleResize)
+    })
+    ro.observe(el)
 
     return () => {
-      window.removeEventListener('resize', handleResize)
+      ro.disconnect()
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
@@ -125,7 +143,17 @@ function PriceChart({ symbol }: { symbol: string }) {
         close: c.close,
       }))
     )
+    chartRef.current?.timeScale().fitContent()
   }, [candles])
+
+  if (candles.length === 0) {
+    return (
+      <div className="card p-8 text-center text-surface-400">
+        <CandlestickChart className="w-6 h-6 mx-auto mb-2 opacity-40" />
+        <p className="text-sm">No candle data available. The bot engine writes candle data from live market rates — data appears once the engine processes heartbeats.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="card p-4">
@@ -141,13 +169,16 @@ export function DashboardPage() {
   const [signals, setSignals] = useState<Signal[]>([])
   const [snapshots, setSnapshots] = useState<AccountSnapshot[]>([])
   const [chartSymbol, setChartSymbol] = useState<string>(PAIRS[0])
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     if (!user) return
-    const unsubTrades = subscribeOpenTrades(user.uid, setTrades, activeAccount?.id)
+    setLoaded(false)
+    const timer = setTimeout(() => setLoaded(true), 3000)
+    const unsubTrades = subscribeOpenTrades(user.uid, (d: Trade[]) => { setTrades(d); clearTimeout(timer); setLoaded(true) }, activeAccount?.id)
     const unsubSignals = subscribeSignals(user.uid, setSignals, 5)
     const unsubSnapshots = subscribeAccountSnapshots(user.uid, setSnapshots, activeAccount?.id)
-    return () => { unsubTrades(); unsubSignals(); unsubSnapshots() }
+    return () => { clearTimeout(timer); unsubTrades(); unsubSignals(); unsubSnapshots() }
   }, [user, activeAccount?.id])
 
   const openTrades = trades.filter((t) => t.status === 'open')
@@ -177,17 +208,59 @@ export function DashboardPage() {
   const defaultSymbol = openTrades.length > 0 ? openTrades[0].pair.replace('/', '') : chartSymbol
   const activeSymbol = defaultSymbol
 
+  const openTradeColumns: Column<Trade>[] = [
+    { header: 'Pair', render: (t) => <span className="font-medium">{t.pair}</span> },
+    {
+      header: 'Direction',
+      render: (t) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+          {t.direction === 'buy' ? 'LONG' : 'SHORT'}
+        </span>
+      ),
+    },
+    { header: 'Entry', render: (t) => <span className="font-mono">{t.openPrice.toFixed(5)}</span>, textAlign: 'right' },
+    { header: 'Current', render: (t) => <span className="font-mono">{t.currentPrice ? t.currentPrice.toFixed(5) : '—'}</span>, textAlign: 'right' },
+    { header: 'SL', render: (t) => <span className="font-mono text-red-400">{t.sl.toFixed(5)}</span>, textAlign: 'right' },
+    { header: 'TP', render: (t) => <span className="font-mono text-green-400">{t.tp.toFixed(5)}</span>, textAlign: 'right' },
+    { header: 'Pips', render: (t) => <span className="font-mono">{t.pips ?? '—'}</span>, textAlign: 'right' },
+    { header: 'P&L', render: (t) => <span className={`font-mono ${(t.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>{t.pnl != null ? `$${t.pnl.toFixed(2)}` : '—'}</span>, textAlign: 'right' },
+  ]
+
+  const signalColumns: Column<Signal>[] = [
+    { header: 'Time', render: (s) => <span className="text-surface-400">{new Date(s.timestamp).toLocaleTimeString()}</span> },
+    { header: 'Pair', render: (s) => <span className="font-medium">{s.pair}</span> },
+    {
+      header: 'Direction',
+      render: (s) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${s.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+          {s.direction === 'buy' ? 'BUY' : 'SELL'}
+        </span>
+      ),
+    },
+    { header: 'Patterns', render: (s) => <span className="text-surface-400">{s.patterns.join(', ')}</span> },
+    { header: 'Price', render: (s) => <span className="font-mono">{s.price.toFixed(5)}</span>, textAlign: 'right' },
+    {
+      header: 'Status',
+      render: (s) => (
+        <span className={`text-xs px-2 py-0.5 rounded ${s.executed ? 'bg-green-900/30 text-green-400' : 'bg-surface-700 text-surface-400'}`}>
+          {s.executed ? 'Executed' : 'Pending'}
+        </span>
+      ),
+      textAlign: 'center',
+    },
+  ]
+
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-surface-400 text-sm mt-1">
+          <p className="text-surface-400 text-sm mt-1 truncate">
             {activeAccount ? `${activeAccount.label} · ` : ''}
             Welcome back, {user?.email?.split('@')[0]}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {activeAccount && (
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
               activeAccount.type === 'paper' ? 'bg-amber-900/30 text-amber-400' :
@@ -202,125 +275,97 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {stats.map((s) => (
-          <div key={s.label} className="card p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg bg-surface-800 flex items-center justify-center ${s.color}`}>
-              <s.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-xs text-surface-400">{s.label}</p>
-              <p className="text-lg font-semibold">{s.value}</p>
-            </div>
+      {!loaded ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {Array.from({ length: 5 }).map((_, i) => <SkeletonStatCard key={i} />)}
           </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <AccountEquityCurve snapshots={snapshots} />
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-surface-200">Price Chart</h2>
-            <select
-              className="input text-sm py-1 w-28"
-              value={activeSymbol}
-              onChange={(e) => setChartSymbol(e.target.value)}
-            >
-              {PAIRS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SkeletonChart />
+            <SkeletonChart />
           </div>
-          <PriceChart symbol={activeSymbol} />
-        </div>
-      </div>
-
-      {openTrades.length === 0 && signals.length === 0 ? (
-        <div className="card p-8 text-center text-surface-400">
-          <Activity className="w-8 h-8 mx-auto mb-3 opacity-40" />
-          <p>No active trades or signals yet.</p>
-          <p className="text-sm mt-1">Create a strategy and activate it — the bot engine will detect patterns automatically.</p>
-        </div>
+        </>
       ) : (
         <>
-          {openTrades.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {stats.map((s) => (
+              <div key={s.label} className="card p-4 flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg bg-surface-800 flex items-center justify-center ${s.color}`}>
+                  <s.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs text-surface-400">{s.label}</p>
+                  <p className="text-lg font-semibold">{s.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <AccountEquityCurve snapshots={snapshots} />
             <div>
-              <h2 className="text-lg font-semibold mb-3">Open Trades</h2>
-              <div className="card overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
-                      <th className="text-left p-3">Pair</th>
-                      <th className="text-left p-3">Direction</th>
-                      <th className="text-right p-3">Entry</th>
-                      <th className="text-right p-3">Current</th>
-                      <th className="text-right p-3">SL</th>
-                      <th className="text-right p-3">TP</th>
-                      <th className="text-right p-3">Pips</th>
-                      <th className="text-right p-3">P&L</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {openTrades.map((t) => (
-                      <tr key={t.id} className="border-b border-surface-700/50">
-                        <td className="p-3 font-medium">{t.pair}</td>
-                        <td className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-surface-200">Price Chart</h2>
+                <select
+                  className="input text-sm py-1 w-28"
+                  value={activeSymbol}
+                  onChange={(e) => setChartSymbol(e.target.value)}
+                >
+                  {PAIRS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <PriceChart symbol={activeSymbol} />
+            </div>
+          </div>
+
+          {openTrades.length === 0 && signals.length === 0 ? (
+            <div className="card p-8 text-center text-surface-400">
+              <Activity className="w-8 h-8 mx-auto mb-3 opacity-40" />
+              <p>No active trades or signals yet.</p>
+              <p className="text-sm mt-1">Create a strategy and activate it — the bot engine will detect patterns automatically.</p>
+            </div>
+          ) : (
+            <>
+              {openTrades.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-3">Open Trades</h2>
+                  <ResponsiveTable<Trade>
+                    columns={openTradeColumns}
+                    data={openTrades}
+                    keyExtractor={(t) => t.id}
+                    mobileCard={(t) => (
+                      <div className="card !p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-surface-200">{t.pair}</span>
                           <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
                             {t.direction === 'buy' ? 'LONG' : 'SHORT'}
                           </span>
-                        </td>
-                        <td className="p-3 text-right font-mono">{t.openPrice.toFixed(5)}</td>
-                        <td className="p-3 text-right font-mono">{t.currentPrice ? t.currentPrice.toFixed(5) : '—'}</td>
-                        <td className="p-3 text-right font-mono text-red-400">{t.sl.toFixed(5)}</td>
-                        <td className="p-3 text-right font-mono text-green-400">{t.tp.toFixed(5)}</td>
-                        <td className="p-3 text-right font-mono">{t.pips ?? '—'}</td>
-                        <td className={`p-3 text-right font-mono ${(t.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {t.pnl != null ? `$${t.pnl.toFixed(2)}` : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div><span className="text-xs text-surface-400">Entry</span><p className="font-mono">{t.openPrice.toFixed(5)}</p></div>
+                          <div><span className="text-xs text-surface-400">Current</span><p className="font-mono">{t.currentPrice ? t.currentPrice.toFixed(5) : '—'}</p></div>
+                          <div><span className="text-xs text-surface-400">SL</span><p className="font-mono text-red-400">{t.sl.toFixed(5)}</p></div>
+                          <div><span className="text-xs text-surface-400">TP</span><p className="font-mono text-green-400">{t.tp.toFixed(5)}</p></div>
+                          <div><span className="text-xs text-surface-400">Pips</span><p className="font-mono">{t.pips ?? '—'}</p></div>
+                          <div><span className="text-xs text-surface-400">P&L</span><p className={`font-mono ${(t.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>{t.pnl != null ? `$${t.pnl.toFixed(2)}` : '—'}</p></div>
+                        </div>
+                      </div>
+                    )}
+                  />
+                </div>
+              )}
 
-          {signals.length > 0 && (
-            <div>
-              <h2 className="text-lg font-semibold mb-3">Recent Signals</h2>
-              <div className="card overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-700 text-surface-400 text-xs uppercase">
-                      <th className="text-left p-3">Time</th>
-                      <th className="text-left p-3">Pair</th>
-                      <th className="text-left p-3">Direction</th>
-                      <th className="text-left p-3">Patterns</th>
-                      <th className="text-right p-3">Price</th>
-                      <th className="text-center p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {signals.map((s) => (
-                      <tr key={s.id} className="border-b border-surface-700/50">
-                        <td className="p-3 text-surface-400">{new Date(s.timestamp).toLocaleTimeString()}</td>
-                        <td className="p-3 font-medium">{s.pair}</td>
-                        <td className="p-3">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${s.direction === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
-                            {s.direction === 'buy' ? 'BUY' : 'SELL'}
-                          </span>
-                        </td>
-                        <td className="p-3 text-surface-400">{s.patterns.join(', ')}</td>
-                        <td className="p-3 text-right font-mono">{s.price.toFixed(5)}</td>
-                        <td className="p-3 text-center">
-                          <span className={`text-xs px-2 py-0.5 rounded ${s.executed ? 'bg-green-900/30 text-green-400' : 'bg-surface-700 text-surface-400'}`}>
-                            {s.executed ? 'Executed' : 'Pending'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              {signals.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-3">Recent Signals</h2>
+                  <ResponsiveTable<Signal>
+                    columns={signalColumns}
+                    data={signals}
+                    keyExtractor={(s) => s.id}
+                  />
+                </div>
+              )}
+            </>
           )}
         </>
       )}

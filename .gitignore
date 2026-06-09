@@ -5,3 +5,4 @@ dist
 .firebase
 *.log
 bot-engine/service-account.json
+.gstack/

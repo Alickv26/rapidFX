@@ -29,6 +29,7 @@ export default {
           900: '#083344',
         },
       },
+
     },
   },
   plugins: [require('@tailwindcss/forms')],

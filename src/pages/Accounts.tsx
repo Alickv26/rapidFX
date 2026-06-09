@@ -101,6 +101,7 @@ export function AccountsPage() {
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="e.g. IC Markets Live"
+                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
               />
             </div>
             <div>
@@ -110,6 +111,7 @@ export function AccountsPage() {
                 className="input"
                 value={type}
                 onChange={(e) => setType(e.target.value as Tab)}
+                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
               >
                 <option value="paper">Paper Trading</option>
                 <option value="demo">Demo (MT5)</option>
@@ -127,6 +129,7 @@ export function AccountsPage() {
                 value={initialBalance}
                 onChange={(e) => setInitialBalance(e.target.value)}
                 min={0}
+                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
               />
             </div>
           )}
@@ -147,13 +150,13 @@ export function AccountsPage() {
         <div className="space-y-4">
           {accounts.map((acc) => (
             <div key={acc.id} className="card p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeColor(acc.type)}`}>
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${typeColor(acc.type)}`}>
                     {typeIcon(acc.type)}
                   </div>
-                  <div>
-                    <h3 className="font-medium flex items-center gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-medium flex items-center gap-2 flex-wrap">
                       {acc.label}
                       <span className={`text-xs px-2 py-0.5 rounded ${typeColor(acc.type)}`}>
                         {acc.type.toUpperCase()}
@@ -164,17 +167,15 @@ export function AccountsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-xs text-surface-400 bg-surface-800 px-3 py-1.5 rounded-lg max-w-[160px] sm:max-w-none">
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
+                  <button
+                    onClick={() => copyKey(acc.apiKey, acc.id)}
+                    className="flex items-center gap-1.5 text-xs text-surface-400 bg-surface-800 hover:bg-surface-700 transition-colors px-3 py-1.5 rounded-lg max-w-[120px] sm:max-w-[200px]"
+                    title="Copy API Key"
+                  >
                     <code className="text-surface-200 truncate">{acc.apiKey}</code>
-                    <button
-                      onClick={() => copyKey(acc.apiKey, acc.id)}
-                      className="p-0.5 hover:text-surface-200 transition-colors"
-                      title="Copy API Key"
-                    >
-                      {copiedId === acc.id ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                    </button>
-                  </div>
+                    {copiedId === acc.id ? <Check size={14} className="text-green-400 shrink-0" /> : <Copy size={14} className="shrink-0" />}
+                  </button>
                   <button
                     onClick={() => handleDelete(acc.id, acc.label)}
                     className="btn-ghost p-2 text-red-400 hover:text-red-300"

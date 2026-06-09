@@ -41,7 +41,7 @@ export function InstallPrompt() {
   if (!visible || dismissed) return null
 
   return (
-    <div className="fixed bottom-20 md:bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
+    <div className="fixed bottom-[calc(4rem+1rem)] md:bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
       <div className="bg-surface-200 border border-surface-200 rounded-xl shadow-2xl p-4 flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-brand-500/20 flex items-center justify-center shrink-0">
           <Download size={18} className="text-brand-400" />
